@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 
@@ -81,6 +81,8 @@ const iconPaths = {
   eye: <><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></>,
   panel: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M8 4v16" /></>,
   refresh: <><path d="M20 11a8 8 0 0 0-14.7-4L3 10" /><path d="M3 5v5h5M4 13a8 8 0 0 0 14.7 4L21 14" /><path d="M21 19v-5h-5" /></>,
+  rain: <><path d="M20 16.2A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" /><path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2" /></>,
+  robot: <><rect x="3" y="11" width="18" height="10" rx="2" /><path d="M12 2v4M8 11V7.5a4 4 0 0 1 8 0V11" /><circle cx="9" cy="16" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="16" r="1" fill="currentColor" stroke="none" /></>,
 }
 
 function Icon({ name, size = 18, className = '' }) {
@@ -149,15 +151,13 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
       {toast && <div className="toast-notice">{toast}</div>}
 
       <div className="cue-auth-box">
-        <div className="cue-brand-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+        <div className="cue-brand-header">
           <img
             src="/sotarium-brand-icon.png"
             alt="Sotarium Icon"
             className="sotarium-brand-icon-img"
           />
-          <span style={{ fontSize: '24px', fontWeight: 800, fontStyle: 'italic', letterSpacing: '0.5px', color: '#ffffff' }}>
-            Sotarium<span style={{ color: '#acff46' }}>.</span>
-          </span>
+          <span className="cue-brand-wordmark">Sotarium</span>
         </div>
 
         <h1 className="cue-auth-title">{mode === 'signup' ? 'Sign up' : 'Log in'}</h1>
@@ -201,29 +201,117 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
   )
 }
 
+// ============================================================================
+// Rollbux Dashboard — Sidebar Tabs: Automations | Rains
+// ============================================================================
+
 function RollbuxDashboard({ user, onLogout }) {
   const [displayUnit, setDisplayUnit] = useState('BUX')
-  const [copiedLink, setCopiedLink] = useState(false)
-  const [copiedCode, setCopiedCode] = useState(false)
+  const [activeTab, setActiveTab] = useState('automations') // 'automations' | 'rains'
   const [toast, setToast] = useState('')
+
+  // Auto Upgrader state
+  const [upgraderEnabled, setUpgraderEnabled] = useState(false)
+  const [upgraderMultiplier, setUpgraderMultiplier] = useState(1.1)
+  const [upgraderAutoRandom, setUpgraderAutoRandom] = useState(false)
+  const [upgraderAutoSell, setUpgraderAutoSell] = useState(false)
+
+  // Auto Battle state
+  const [battleEnabled, setBattleEnabled] = useState(false)
+  const [battleBorrowMode, setBattleBorrowMode] = useState(true)
+  const [battleCrazyMode, setBattleCrazyMode] = useState(true)
+
+  // Auto Mines state
+  const [minesEnabled, setMinesEnabled] = useState(false)
+
+  // Rains state
+  const [rains, setRains] = useState([])
+  const [rainsJoined, setRainsJoined] = useState(0)
+  const [rainsTotalTime, setRainsTotalTime] = useState('0s')
+  const [rainsEarnings, setRainsEarnings] = useState(0)
+  const [statsPeriod, setStatsPeriod] = useState('24H')
+
+  const sessionToken = window.localStorage.getItem('sotarium_session_token') || ''
 
   const showToast = (msg) => {
     setToast(msg)
     setTimeout(() => setToast(''), 2500)
   }
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(`https://rollbux.com/r/${user.username.toLowerCase()}`)
-    setCopiedLink(true)
-    showToast('Referral link copied')
-    setTimeout(() => setCopiedLink(false), 2000)
+  // Format balance based on display unit
+  const formatBalance = (raw) => {
+    const bux = raw ? raw / 1000000 : 0
+    if (displayUnit === 'BUX') return bux.toFixed(2) + ' BUX'
+    if (displayUnit === 'USD') return '$' + (bux * 0.01).toFixed(4)
+    if (displayUnit === 'SOL') return (bux * 0.0001).toFixed(6) + ' SOL'
+    return bux.toFixed(2)
   }
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(user.username)
-    setCopiedCode(true)
-    showToast('Referral code copied')
-    setTimeout(() => setCopiedCode(false), 2000)
+  // Fetch active rains from rollbux API
+  const fetchRains = async () => {
+    try {
+      const res = await fetch('https://rollbux.com/_api/rain', {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+          'Cookie': `authjs.session-token=${sessionToken}`,
+          'Origin': 'https://rollbux.com',
+          'Referer': 'https://rollbux.com/',
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const list = data.data?.rains || data.data || data.rains || []
+        setRains(Array.isArray(list) ? list : [])
+      }
+    } catch (e) {}
+  }
+
+  // Join a rain
+  const joinRain = async (rainId) => {
+    try {
+      const res = await fetch(`https://rollbux.com/_api/rain/${rainId}/join`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionToken}`,
+          'Cookie': `authjs.session-token=${sessionToken}`,
+          'Origin': 'https://rollbux.com',
+          'Referer': 'https://rollbux.com/',
+        }
+      })
+      if (res.ok) {
+        showToast('Joined rain successfully!')
+        setRainsJoined(prev => prev + 1)
+        fetchRains()
+      } else {
+        const d = await res.json().catch(() => ({}))
+        showToast(d.message || 'Failed to join rain.')
+      }
+    } catch (e) {
+      showToast('Error joining rain.')
+    }
+  }
+
+  useEffect(() => {
+    fetchRains()
+    const interval = setInterval(fetchRains, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formatRainTime = (endsAt) => {
+    if (!endsAt) return '00:00'
+    const diff = Math.max(0, Math.floor((new Date(endsAt) - Date.now()) / 1000))
+    const m = Math.floor(diff / 60).toString().padStart(2, '0')
+    const s = (diff % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
+  const formatRainDate = (createdAt) => {
+    if (!createdAt) return '—'
+    const d = new Date(createdAt)
+    return `${d.getDate()} ${d.toLocaleString('en', { month: 'long' })} ${d.getHours()}h${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`
   }
 
   return (
@@ -231,60 +319,283 @@ function RollbuxDashboard({ user, onLogout }) {
       {toast && <div className="toast-notice">{toast}</div>}
 
       <div className="dashboard-container">
+        {/* ── Header ── */}
         <header className="dashboard-header">
-          <button className="logout-pill" onClick={onLogout}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            Log Out
-          </button>
-          <h1 className="dashboard-logo-title">{user.username}</h1>
+          <div className="dashboard-header-left">
+            <img src="/sotarium-brand-icon.png" alt="Sotarium" className="header-brand-icon" />
+            <span className="dashboard-brand-title">Sotarium</span>
+          </div>
+
+          <div className="dashboard-header-right">
+            {/* Display Unit Switcher in top-right */}
+            <div className="unit-pills header-unit-pills">
+              {['BUX', 'USD', 'SOL'].map((unit) => (
+                <button
+                  key={unit}
+                  className={`unit-pill ${displayUnit === unit ? 'active' : ''}`}
+                  onClick={() => setDisplayUnit(unit)}
+                >
+                  {unit}
+                </button>
+              ))}
+            </div>
+
+            <button className="logout-pill" onClick={onLogout}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Log Out
+            </button>
+          </div>
         </header>
 
         <div className="dashboard-layout">
+          {/* ── Sidebar with Tabs ── */}
           <aside className="dashboard-sidebar">
-            <div className="sidebar-card">
-              <h2 className="sidebar-card-title">Your Referral code</h2>
-              <div className="ref-code-box">
-                <span className="ref-code-text">{user.username}</span>
-                <div className="ref-actions">
-                  <button className="ref-action-btn" onClick={() => showToast('Edit referral')}>Edit</button>
-                  <button className="ref-action-btn" onClick={handleCopyCode}>
-                    {copiedCode ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="ref-link-box" onClick={handleCopyLink}>
-                <span className="ref-link-text">https://rollbux.com/r/{user.username.toLowerCase()}</span>
-                <img src="/figma/af-copy.svg" alt="Copy" width="16" height="16" style={{ opacity: 0.8 }} />
-              </div>
-            </div>
-
-            <div className="unit-switch-row">
-              <span style={{ color: '#9aa3a8', fontWeight: 600 }}>Display Unit:</span>
-              <div className="unit-pills">
-                {['BUX', 'USD', 'SOL'].map((unit) => (
-                  <button
-                    key={unit}
-                    className={`unit-pill ${displayUnit === unit ? 'active' : ''}`}
-                    onClick={() => setDisplayUnit(unit)}
-                  >
-                    {unit}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="sidebar-card">
-              <h2 className="sidebar-card-title">Your Accounts</h2>
-              <p style={{ fontSize: '11px', color: '#9aa3a8' }}>Your accounts list</p>
-              <button className="purple-btn" onClick={() => showToast('Opening accounts list')}>
-                Open Your Accounts
+            {/* Tab switcher */}
+            <div className="sidebar-tabs">
+              <button
+                className={`sidebar-tab-btn ${activeTab === 'automations' ? 'active' : ''}`}
+                onClick={() => setActiveTab('automations')}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="10" rx="2" />
+                  <path d="M12 2v4M8 11V7.5a4 4 0 0 1 8 0V11" />
+                  <circle cx="9" cy="16" r="1" fill="currentColor" stroke="none" />
+                  <circle cx="15" cy="16" r="1" fill="currentColor" stroke="none" />
+                </svg>
+                Automations
+              </button>
+              <button
+                className={`sidebar-tab-btn ${activeTab === 'rains' ? 'active' : ''}`}
+                onClick={() => setActiveTab('rains')}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 16.2A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+                  <path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2" />
+                </svg>
+                Rains
               </button>
             </div>
 
-            {/* Bottom-left user profile & level card */}
+            {/* Tab content scrollable area */}
+            <div className="sidebar-tab-content">
+              {activeTab === 'automations' && (
+                <div className="sidebar-automations">
+                  {/* Auto Upgrader */}
+                  <div className="sidebar-module">
+                    <div className="sidebar-module-header">
+                      <div className="module-title-wrap">
+                        <span className="sidebar-module-title">Auto Upgrader</span>
+                        <span className={upgraderEnabled ? 'badge-enabled' : 'badge-disabled'}>
+                          {upgraderEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <label className="toggle-switch">
+                        <input type="checkbox" checked={upgraderEnabled} onChange={e => setUpgraderEnabled(e.target.checked)} />
+                        <span className="toggle-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="sidebar-module-body">
+                      <div className="wheel-circle-wrap" style={{ width: 140, height: 140, margin: '0 auto' }}>
+                        <svg width="140" height="140" viewBox="0 0 200 200">
+                          <circle cx="100" cy="100" r="75" fill="none" stroke="#131a29" strokeWidth="14" />
+                          <circle
+                            cx="100" cy="100" r="75"
+                            fill="none" stroke="#8b5cf6" strokeWidth="14"
+                            strokeDasharray="380 471"
+                            transform="rotate(-90 100 100)"
+                          />
+                        </svg>
+                        <div className="wheel-center-text" style={{ fontSize: 22 }}>
+                          {((upgraderMultiplier - 1) * 100 / upgraderMultiplier * 10).toFixed(0)}%
+                        </div>
+                      </div>
+
+                      <div className="module-row">
+                        <span className="module-row-label">Multiplier</span>
+                        <span style={{ color: '#acff46', fontWeight: 800, fontSize: 13 }}>{upgraderMultiplier}x</span>
+                      </div>
+
+                      <div className="module-row">
+                        <span className="module-row-label">Auto Random</span>
+                        <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
+                          <input type="checkbox" checked={upgraderAutoRandom} onChange={e => setUpgraderAutoRandom(e.target.checked)} />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="module-row">
+                        <span className="module-row-label">Auto Sell</span>
+                        <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
+                          <input type="checkbox" checked={upgraderAutoSell} onChange={e => setUpgraderAutoSell(e.target.checked)} />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <button
+                        className="green-play-btn"
+                        style={{ width: '100%', marginTop: 4 }}
+                        onClick={() => {
+                          if (!upgraderEnabled) { showToast('Enable Auto Upgrader first'); return }
+                          showToast('Auto Upgrader started!')
+                        }}
+                      >
+                        Play
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Auto Battle */}
+                  <div className="sidebar-module">
+                    <div className="sidebar-module-header">
+                      <div className="module-title-wrap">
+                        <span className="sidebar-module-title">Auto Battle</span>
+                        <span className={battleEnabled ? 'badge-enabled' : 'badge-disabled'}>
+                          {battleEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <label className="toggle-switch">
+                        <input type="checkbox" checked={battleEnabled} onChange={e => setBattleEnabled(e.target.checked)} />
+                        <span className="toggle-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="sidebar-module-body">
+                      <div className="module-row">
+                        <span className="module-row-label">Borrow Mode</span>
+                        <label className="toggle-switch" style={{ transform: 'scale(0.8)' }}>
+                          <input type="checkbox" checked={battleBorrowMode} onChange={e => setBattleBorrowMode(e.target.checked)} />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="module-row">
+                        <span className="module-row-label">50/50 Crazy Mode</span>
+                        <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
+                          <input type="checkbox" checked={battleCrazyMode} onChange={e => setBattleCrazyMode(e.target.checked)} />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+
+                      <div className="module-row">
+                        <span style={{ fontSize: 11, color: '#9aa3a8' }}>Modifiers</span>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                          <span style={{ background: 'rgba(234,179,8,0.1)', color: '#facc15', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800 }}>JACKPOT</span>
+                          <span style={{ background: 'rgba(172,255,70,0.1)', color: '#acff46', padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 800 }}>3v3</span>
+                        </div>
+                      </div>
+
+                      <button
+                        className="purple-play-btn"
+                        style={{ width: '100%', marginTop: 4 }}
+                        onClick={() => {
+                          if (!battleEnabled) { showToast('Enable Auto Battle first'); return }
+                          showToast('Auto Battle started!')
+                        }}
+                      >
+                        Create Battle
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Auto Mines */}
+                  <div className="sidebar-module">
+                    <div className="sidebar-module-header">
+                      <div className="module-title-wrap">
+                        <span className="sidebar-module-title">Auto Mines</span>
+                        <span className={minesEnabled ? 'badge-enabled' : 'badge-disabled'}>
+                          {minesEnabled ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                      <label className="toggle-switch">
+                        <input type="checkbox" checked={minesEnabled} onChange={e => setMinesEnabled(e.target.checked)} />
+                        <span className="toggle-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="sidebar-module-body">
+                      <div className="module-row">
+                        <span style={{ fontSize: 11, color: '#9aa3a8' }}>Status</span>
+                        <span style={{ fontSize: 11, color: minesEnabled ? '#acff46' : '#9aa3a8', fontWeight: 700 }}>
+                          {minesEnabled ? 'Active' : 'Ready'}
+                        </span>
+                      </div>
+
+                      <button
+                        className="red-play-btn"
+                        style={{ width: '100%', marginTop: 4 }}
+                        onClick={() => {
+                          if (!minesEnabled) { showToast('Enable Auto Mines first'); return }
+                          showToast('Auto Mines started!')
+                        }}
+                      >
+                        Play
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'rains' && (
+                <div className="sidebar-rains">
+                  {/* Rain Stats */}
+                  <div className="sidebar-rain-stats">
+                    <div className="rain-stat-item">
+                      <span className="rain-stat-label">Joined</span>
+                      <span className="rain-stat-value">{rainsJoined}</span>
+                    </div>
+                    <div className="rain-stat-item">
+                      <span className="rain-stat-label">Earnings</span>
+                      <span className="rain-stat-value lime">{rainsEarnings.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Active Rains list */}
+                  <div className="rain-list-header">
+                    <span className="rain-list-title">Active Rains</span>
+                    <button className="rain-refresh-btn" onClick={fetchRains}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 11a8 8 0 0 0-14.7-4L3 10" />
+                        <path d="M3 5v5h5M4 13a8 8 0 0 0 14.7 4L21 14" />
+                        <path d="M21 19v-5h-5" />
+                      </svg>
+                      Refresh
+                    </button>
+                  </div>
+
+                  {rains.length === 0 ? (
+                    <div className="rain-empty">
+                      <span>No active rains</span>
+                    </div>
+                  ) : (
+                    <div className="rain-cards">
+                      {rains.map((rain, i) => (
+                        <div key={rain.id || i} className="rain-card">
+                          <div className="rain-card-top">
+                            <span className="rain-card-amount">
+                              <img src="/figma/af-coin-24.svg" alt="" width={14} height={14} />
+                              {rain.amount ? (rain.amount / 1000000).toFixed(2) : '?'}
+                            </span>
+                            <span className="rain-card-time">{formatRainTime(rain.ends_at || rain.endsAt)}</span>
+                          </div>
+                          <div className="rain-card-date">{formatRainDate(rain.created_at || rain.createdAt)}</div>
+                          <button
+                            className="green-play-btn rain-join-btn"
+                            onClick={() => joinRain(rain.id)}
+                          >
+                            Join Rain
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Player Profile Card — always pinned to bottom of sidebar */}
             <div className="player-profile-card">
               <div className="player-info-left">
                 <div className="player-avatar">
@@ -307,29 +618,31 @@ function RollbuxDashboard({ user, onLogout }) {
             </div>
           </aside>
 
+          {/* ── Main Content ── */}
           <section className="dashboard-main">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Overview */}
+            <div>
               <div className="section-title-row">
                 <h2 className="section-heading">Overview</h2>
                 <button className="lime-clear-btn" onClick={() => showToast('Overview cleared')}>Clear</button>
               </div>
 
-              <div className="stats-cards-grid">
+              <div className="stats-cards-grid" style={{ marginTop: 16 }}>
                 <div className="stat-metric-card">
                   <span className="stat-label">Rains Joined</span>
-                  <div className="stat-value">0 Rains</div>
+                  <div className="stat-value">{rainsJoined} Rains</div>
                 </div>
 
                 <div className="stat-metric-card">
                   <span className="stat-label">How Much Time</span>
-                  <div className="stat-value">0S</div>
+                  <div className="stat-value">{rainsTotalTime}</div>
                 </div>
 
                 <div className="stat-metric-card">
                   <span className="stat-label">Total Earnings</span>
                   <div className="stat-value">
                     <img src="/figma/af-coin-24.svg" alt="Coin" className="token-coin-icon" />
-                    0
+                    {rainsEarnings.toFixed(2)}
                   </div>
                 </div>
 
@@ -337,206 +650,57 @@ function RollbuxDashboard({ user, onLogout }) {
                   <span className="stat-label">Current Balance</span>
                   <div className="stat-value">
                     <img src="/figma/af-coin-24.svg" alt="Coin" className="token-coin-icon" />
-                    {user.token_balance ? (user.token_balance / 1000000).toFixed(2) : '2.80'}
+                    {user.token_balance ? (user.token_balance / 1000000).toFixed(2) : '0.00'}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="modules-grid">
-              <div>
-                <div className="module-header">
-                  <h2 className="section-heading">Statistics</h2>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button className="lime-clear-btn" onClick={() => showToast('Stats cleared')}>Clear</button>
-                    <div className="unit-pills">
-                      <button className="unit-pill active">24H</button>
-                      <button className="unit-pill">Week</button>
-                      <button className="unit-pill">Month</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="stat-panel-card">
-                  <div className="graph-viewport">
-                    <div className="graph-y-axis">
-                      <span>100</span>
-                      <span>0</span>
-                    </div>
-
-                    <div className="graph-svg-box">
-                      <svg width="100%" height="100%" viewBox="0 0 500 300" preserveAspectRatio="none">
-                        <line x1="0" y1="20" x2="500" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                        <line x1="0" y1="150" x2="500" y2="150" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                        <line x1="0" y1="280" x2="500" y2="280" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                        <path d="M 0 280 L 500 280" fill="none" stroke="#7974FF" strokeWidth="2" />
-                      </svg>
-                    </div>
+            {/* Statistics */}
+            <div>
+              <div className="module-header">
+                <h2 className="section-heading">Statistics</h2>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="lime-clear-btn" onClick={() => showToast('Stats cleared')}>Clear</button>
+                  <div className="unit-pills">
+                    {['24H', 'Week', 'Month'].map(p => (
+                      <button
+                        key={p}
+                        className={`unit-pill ${statsPeriod === p ? 'active' : ''}`}
+                        onClick={() => setStatsPeriod(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
 
-              <div>
-                <div className="module-header">
-                  <div className="module-title-wrap">
-                    <h2 className="module-title">Auto Upgrader</h2>
-                    <span className="badge-disabled">Disabled</span>
+              <div className="stat-panel-card">
+                <div className="graph-viewport">
+                  <div className="graph-y-axis">
+                    <span>100</span>
+                    <span>0</span>
                   </div>
-                  <label className="toggle-switch">
-                    <input type="checkbox" />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-card">
-                  <div className="wheel-circle-wrap">
-                    <svg width="200" height="200" viewBox="0 0 200 200">
-                      <circle cx="100" cy="100" r="75" fill="none" stroke="#131a29" strokeWidth="14" />
-                      <circle
-                        cx="100"
-                        cy="100"
-                        r="75"
-                        fill="none"
-                        stroke="#8b5cf6"
-                        strokeWidth="14"
-                        strokeDasharray="380 471"
-                        transform="rotate(-90 100 100)"
-                      />
-                      <circle cx="100" cy="25" r="5" fill="#ffffff" />
-                      <circle cx="100" cy="175" r="5" fill="#ffffff" />
+                  <div className="graph-svg-box">
+                    <svg width="100%" height="100%" viewBox="0 0 500 300" preserveAspectRatio="none">
+                      <line x1="0" y1="20" x2="500" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                      <line x1="0" y1="150" x2="500" y2="150" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                      <line x1="0" y1="280" x2="500" y2="280" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                      <path d="M 0 280 L 500 280" fill="none" stroke="#7974FF" strokeWidth="2" />
                     </svg>
-                    <div className="wheel-center-text">81.82%</div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#9aa3a8', fontWeight: 800 }}>
-                    <span>MULTIPLIER TARGET</span>
-                    <span style={{ color: '#ffffff' }}>1.10x</span>
-                  </div>
-
-                  <div className="module-row">
-                    <span style={{ fontWeight: 800, fontSize: '13px' }}>1.1</span>
-                    <span style={{ color: '#6d7680' }}>✕</span>
-                  </div>
-
-                  <div className="module-row">
-                    <span className="module-row-label">Auto Random</span>
-                    <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                      <input type="checkbox" />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="module-row">
-                    <span className="module-row-label">Auto Sell</span>
-                    <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                      <input type="checkbox" />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="module-row">
-                    <span style={{ fontSize: '11px', color: '#9aa3a8', fontWeight: 600 }}>Account</span>
-                    <button className="purple-play-btn" style={{ fontSize: '10px', padding: '4px 10px' }}>
-                      All Accounts
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#9aa3a8' }}>Ready</span>
-                    <button className="purple-play-btn" onClick={() => showToast('Auto Upgrader play triggered')}>
-                      Play
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <div className="module-header">
-                    <div className="module-title-wrap">
-                      <h2 className="module-title">Auto Battle</h2>
-                      <span className="badge-disabled">Disabled</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input type="checkbox" />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="module-card">
-                    <div className="module-row">
-                      <span className="module-row-label">Borrow Mode</span>
-                      <label className="toggle-switch" style={{ transform: 'scale(0.8)' }}>
-                        <input type="checkbox" defaultChecked />
-                        <span className="toggle-slider"></span>
-                      </label>
-                    </div>
-
-                    <div className="module-row">
-                      <span className="module-row-label">50/50 Crazy Mode</span>
-                      <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                        <input type="checkbox" defaultChecked />
-                        <span className="toggle-slider"></span>
-                      </label>
-                    </div>
-
-                    <div className="module-row">
-                      <span style={{ fontSize: '11px', color: '#9aa3a8' }}>Modifiers</span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 800 }}>JACKPOT</span>
-                        <span style={{ background: 'rgba(172, 255, 70, 0.1)', color: '#acff46', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 800 }}>3v3</span>
-                      </div>
-                    </div>
-
-                    <div className="module-row">
-                      <span style={{ fontSize: '11px', color: '#9aa3a8' }}>Account</span>
-                      <button className="purple-play-btn" style={{ fontSize: '10px', padding: '4px 10px' }}>
-                        2 Accs
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#9aa3a8' }}>Ready</span>
-                      <button className="green-play-btn" onClick={() => showToast('Auto Battle ready')}>Create</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="module-header">
-                    <div className="module-title-wrap">
-                      <h2 className="module-title">Auto Mines</h2>
-                      <span className="badge-disabled">Disabled</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input type="checkbox" />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-
-                  <div className="module-card">
-                    <div className="module-row">
-                      <span style={{ fontSize: '11px', color: '#9aa3a8' }}>Account</span>
-                      <button className="purple-play-btn" style={{ fontSize: '10px', padding: '4px 10px' }}>
-                        All Accounts
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#9aa3a8' }}>Ready</span>
-                      <button className="red-play-btn" onClick={() => showToast('Auto Mines Play triggered')}>Play</button>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Rains Table */}
             <div className="rains-section">
               <div className="section-title-row">
                 <h2 className="section-heading">Rains</h2>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <button className="lime-clear-btn" onClick={() => showToast('Rains cleared')}>Clear Rains</button>
-                  <span style={{ fontSize: '12px', color: '#9aa3a8', fontWeight: 600 }}>1 rain</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="lime-clear-btn" onClick={() => { setRains([]); setRainsJoined(0); showToast('Rains cleared') }}>Clear Rains</button>
+                  <span style={{ fontSize: 12, color: '#9aa3a8', fontWeight: 600 }}>{rains.length} rain{rains.length !== 1 ? 's' : ''}</span>
                 </div>
               </div>
 
@@ -551,14 +715,24 @@ function RollbuxDashboard({ user, onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="table-account-name">{user.username.toLowerCase()}</td>
-                      <td className="table-time-left">00:00</td>
-                      <td className="table-in-progress">In Progress</td>
-                      <td>
-                        <span className="table-date-badge">23 October 22h10:20</span>
-                      </td>
-                    </tr>
+                    {rains.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', color: '#6d7680', fontStyle: 'italic', padding: 28 }}>No rains yet</td>
+                      </tr>
+                    ) : (
+                      rains.map((rain, i) => (
+                        <tr key={rain.id || i}>
+                          <td className="table-account-name">{user.username.toLowerCase()}</td>
+                          <td className="table-time-left">{formatRainTime(rain.ends_at || rain.endsAt)}</td>
+                          <td className="table-in-progress">
+                            {rain.amount ? (rain.amount / 1000000).toFixed(2) + ' BUX' : 'In Progress'}
+                          </td>
+                          <td>
+                            <span className="table-date-badge">{formatRainDate(rain.created_at || rain.createdAt)}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
