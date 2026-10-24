@@ -230,7 +230,7 @@ function UpdateDetectedScreen({ onComplete }) {
   )
 }
 
-function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, formatBuxValue }) {
+function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, formatBuxValue, currencyIcon }) {
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -350,7 +350,7 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
               {formatTooltipDate(hoveredPoint.rawTime || hoveredPoint.timestamp || Date.now())}
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <img src="./figma/token-bux.png" alt="Coin" className="size-3.5 object-contain" />
+              <img src={currencyIcon || "./figma/token-bux.png"} alt="Coin" className="size-3.5 object-contain" />
               <span className="text-[14px] font-black tracking-tight text-white leading-none font-mono">
                 {formatBuxValue(hoveredPoint.cumulative)}
               </span>
@@ -364,6 +364,12 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
 
 function RollbuxDashboard({ user, onLogout }) {
   const [currentUnit, setCurrentUnit] = useState('BUX')
+  const getCurrencyIcon = () => {
+    if (currentUnit === 'BUX') return './figma/token-bux.png'
+    if (currentUnit === 'USD') return './figma/token-usd.svg'
+    return './figma/af-coin-24.svg'
+  }
+
   // toast disabled
   const [activeTab, setActiveTab] = useState('24h')
   const [sideTab, setSideTab] = useState('home') // 'home' | 'automations' | 'rains'
@@ -888,7 +894,7 @@ function RollbuxDashboard({ user, onLogout }) {
                       <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
                         <p className="text-[14px] font-medium text-[#9aa3a8]">Total Earnings</p>
                         <div className="flex items-center gap-[8px]">
-                          <img alt="" className="size-[24px]" src="./figma/af-coin-24.svg" />
+                          <img alt="" className="size-[24px] object-contain" src={getCurrencyIcon()} />
                           <p className="text-[20px] font-bold text-white">{formatBuxValue(rainTxs.reduce((acc, t) => acc + (t.amount_bux || 0), 0))}</p>
                         </div>
                       </div>
@@ -896,7 +902,7 @@ function RollbuxDashboard({ user, onLogout }) {
                         <div className="flex min-w-0 flex-col gap-[6px]">
                           <p className="text-[14px] font-medium text-[#acff46]">Current Balance</p>
                           <div className="flex items-center gap-[8px]">
-                            <img alt="" className="size-[24px]" src="./figma/af-coin-24.svg" />
+                            <img alt="" className="size-[24px] object-contain" src={getCurrencyIcon()} />
                             <p className="text-[20px] font-bold text-white">{formatValue(user.token_balance)}</p>
                           </div>
                         </div>
@@ -963,6 +969,7 @@ function RollbuxDashboard({ user, onLogout }) {
                                 pathD={pathD}
                                 chartPoints={chartPoints}
                                 formatBuxValue={formatBuxValue}
+                                currencyIcon={getCurrencyIcon()}
                               />
                             )
                           })()}
