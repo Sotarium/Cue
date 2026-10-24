@@ -279,19 +279,44 @@ function RollbuxDashboard({ user, onLogout }) {
     setTimeout(() => setToast(''), 3000)
   }
 
-  // Fetch rain cycle from Rollbux
+  // Fetch rain data: live cycle (public) + user transactions from backend
+  const [rainCycle, setRainCycle] = useState(null) // { secondsLeft, potBux }
+  const [rainTxs, setRainTxs] = useState([])       // actual earned rain transactions
+
   const fetchRains = async () => {
+    // 1. Live cycle — public endpoint
     try {
       const res = await fetch('https://rollbux.com/_api/rain/current')
       if (res.ok) {
         const d = await res.json()
-        const state = d?.data || {}
-        if (state.cycle_id || state.cycle?.id) {
-          setRains([{
-            id: state.cycle_id || state.cycle?.id,
-            amount: state.live_pot || state.live_pool || 0,
-            ends_at: state.cycle_end || state.cycle?.cycle_end
-          }])
+        const cycleEnd = d?.data?.cycle?.cycle_end
+        const livePool = d?.data?.live_pool || 0
+        if (cycleEnd) {
+          const secondsLeft = Math.max(0, Math.floor((new Date(cycleEnd).getTime() - Date.now()) / 1000))
+          const potBux = parseFloat((livePool / 1000000).toFixed(2))
+          setRainCycle({ secondsLeft, potBux })
+        }
+      }
+    } catch (e) {}
+
+    // 2. User transactions from backend (rain history)
+    try {
+      if (window.electronAPI?.backendCall) {
+        const res = await window.electronAPI.backendCall({
+          endpoint: `/api/user/${encodeURIComponent(user.username)}`,
+          method: 'GET',
+          body: null
+        })
+        if (res.ok && res.data?.user) {
+          const txs = res.data.user.transactions || []
+          setRainTxs(txs.slice(0, 50)) // keep last 50
+          // update overview counts
+          setRains(txs.map((t, i) => ({
+            id: t.cycle_id || i,
+            amount: t.amount_bux || 0,
+            ends_at: t.timestamp,
+            account: t.account || user.username
+          })))
         }
       }
     } catch (e) {}
@@ -360,7 +385,7 @@ function RollbuxDashboard({ user, onLogout }) {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }, ...prev])
       } else {
-        const msg = res.data?.error || res.data?.message || `Error ${res.statusCode}`
+        const msg = (typeof res.data?.error === 'string' ? res.data.error : JSON.stringify(res.data?.error)) || res.data?.message || `HTTP ${res.statusCode}`
         setUpgraderFeedback(`Error: ${msg}`)
         showToast(`Upgrader error: ${msg}`)
       }
@@ -396,7 +421,7 @@ function RollbuxDashboard({ user, onLogout }) {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }, ...prev])
       } else {
-        const msg = res.data?.error || res.data?.message || `Error ${res.statusCode}`
+        const msg = (typeof res.data?.error === 'string' ? res.data.error : JSON.stringify(res.data?.error)) || res.data?.message || `HTTP ${res.statusCode}`
         setBattleFeedback(`Error: ${msg}`)
         showToast(`Battle error: ${msg}`)
         setGameHistory(prev => [{
@@ -424,7 +449,7 @@ function RollbuxDashboard({ user, onLogout }) {
         body: { username: user.username, amount_micro_tokens: 50000000, number_of_mines: 1 }
       })
       if (!startRes.ok || !startRes.data?.success) {
-        const msg = startRes.data?.error || startRes.data?.message || `Error ${startRes.statusCode}`
+        const msg = (typeof startRes.data?.error === 'string' ? startRes.data?.error : JSON.stringify(startRes.data?.error)) || startRes.data?.message || `HTTP ${startRes.statusCode}`
         setMinesFeedback(`Start error: ${msg}`)
         showToast(`Mines start error: ${msg}`)
         return
@@ -438,7 +463,7 @@ function RollbuxDashboard({ user, onLogout }) {
         body: { username: user.username, tile_index: 0 }
       })
       if (!rev1.ok || !rev1.data?.success || rev1.data?.exploded) {
-        const msg = rev1.data?.exploded ? 'Exploded on tile 0!' : (rev1.data?.error || `Error ${rev1.statusCode}`)
+        const msg = rev1.data?.exploded ? 'Exploded on tile 0!' : ((typeof rev1.data?.error === 'string' ? rev1.data?.error : JSON.stringify(rev1.data?.error)) || `HTTP ${rev1.statusCode}`)
         setMinesFeedback(msg)
         showToast(`Mines: ${msg}`)
         setGameHistory(prev => [{
@@ -459,7 +484,7 @@ function RollbuxDashboard({ user, onLogout }) {
         body: { username: user.username, tile_index: 5 }
       })
       if (!rev2.ok || !rev2.data?.success || rev2.data?.exploded) {
-        const msg = rev2.data?.exploded ? 'Exploded on tile 5!' : (rev2.data?.error || `Error ${rev2.statusCode}`)
+        const msg = rev2.data?.exploded ? 'Exploded on tile 5!' : ((typeof rev2.data?.error === 'string' ? rev2.data?.error : JSON.stringify(rev2.data?.error)) || `HTTP ${rev2.statusCode}`)
         setMinesFeedback(msg)
         showToast(`Mines: ${msg}`)
         setGameHistory(prev => [{
@@ -491,7 +516,7 @@ function RollbuxDashboard({ user, onLogout }) {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }, ...prev])
       } else {
-        const msg = cashRes.data?.error || cashRes.data?.message || `Error ${cashRes.statusCode}`
+        const msg = (typeof cashRes.data?.error === 'string' ? cashRes.data?.error : JSON.stringify(cashRes.data?.error)) || cashRes.data?.message || `HTTP ${cashRes.statusCode}`
         setMinesFeedback(`Cashout error: ${msg}`)
         showToast(`Mines cashout error: ${msg}`)
       }
@@ -908,30 +933,47 @@ function RollbuxDashboard({ user, onLogout }) {
 
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
               </div>
+              {/* Live rain cycle banner */}
+              {rainCycle && (
+                <div className="flex items-center justify-between rounded-[12px] border border-[#acff46]/20 bg-[#acff46]/5 px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col">
+                      <span className="text-[12px] font-bold text-[#acff46] uppercase tracking-wider">Live Rain Cycle</span>
+                      <span className="text-[22px] font-black text-white font-mono">{rainCycle.potBux.toFixed(2)} BUX pot</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[11px] text-[#9aa3a8]">Time remaining</span>
+                    <span className="text-[20px] font-black text-white font-mono">
+                      {String(Math.floor(rainCycle.secondsLeft / 60)).padStart(2,'0')}:{String(rainCycle.secondsLeft % 60).padStart(2,'0')}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex w-full flex-col gap-[16px]">
                 <div className="flex w-full items-center justify-between">
-                  <p className="text-[20px] font-bold italic text-white">Active Rains</p>
+                  <p className="text-[20px] font-bold italic text-white">Rain History</p>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="flex h-[30px] items-center justify-center rounded-[7px] px-[12px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear Rains</button>
-                    <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
+                    <button onClick={() => { setRainTxs([]); setRains([]); showToast('Rain history cleared'); }} type="button" className="flex h-[30px] items-center justify-center rounded-[7px] px-[12px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
+                    <span className="text-[13px] text-[#9aa3a8]">{rainTxs.length} rains earned</span>
                   </div>
                 </div>
                 <div className="custom-scroll w-full overflow-x-auto overflow-y-hidden">
-                  <div className="relative w-full min-w-[650px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
-                    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
-                      <div>Account</div><div className="text-center">Time Left</div><div className="text-center">Amount</div><div className="text-right pr-2">Status</div><div />
+                  <div className="relative w-full min-w-[600px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                    <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
+                      <div>Account</div><div className="text-center">Amount</div><div className="text-right pr-2">Time</div>
                     </div>
                     <div className="flex flex-col divide-y divide-white/[0.02]">
-                      {rains.length === 0 ? (
+                      {rainTxs.length === 0 ? (
                         <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
-                          <p className="text-[13px] text-[#9aa3a8]">No active rains. The rain bot will auto-join when a cycle is detected.</p>
+                          <p className="text-[13px] text-[#9aa3a8]">No rain transactions yet. Syncing from backend every 15s...</p>
                         </div>
-                      ) : rains.map((rain, i) => (
-                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
-                          <span className="truncate text-[15px] font-bold italic text-[#acff46]">{user.username}</span>
-                          <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
-                          <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
-                          <span className="text-right pr-2"><span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">Active Cycle</span></span>
+                      ) : rainTxs.map((tx, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02]">
+                          <span className="truncate text-[14px] font-bold italic text-[#acff46]">{tx.account || user.username}</span>
+                          <span className="text-center text-[14px] font-bold text-white">+{(tx.amount_bux || 0).toFixed(2)} BUX</span>
+                          <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                         </div>
                       ))}
                     </div>
