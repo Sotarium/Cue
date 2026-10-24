@@ -42,12 +42,28 @@ async function authenticateToken(token) {
     } else if (typeof user?.level === 'number') {
       playerLevel = user.level
     }
+    let liveBalance = user.token_balance || 0
+    try {
+      const balRes = await fetch('https://rollbux.com/_api/users/me/balance', {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${token.trim()}`,
+          'Cookie': `authjs.session-token=${token.trim()}`
+        }
+      })
+      if (balRes.ok) {
+        const balData = await balRes.json()
+        const b = balData?.data?.token_balance ?? balData?.token_balance
+        if (typeof b === 'number') liveBalance = b
+      }
+    } catch (e) {}
+
     return {
       success: true,
       user: {
         username: user.username || user.name || 'Player',
         level: playerLevel,
-        token_balance: user.token_balance || 0,
+        token_balance: liveBalance,
         avatar: user.avatar_url || user.avatar || null,
         raw: user
       }
@@ -492,24 +508,51 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Live level polling — scrape /profile actively every 8 seconds
+  // Live level & balance polling — scrape actively every 8 seconds
   const [liveLevel, setLiveLevel] = useState(user.level || user.raw?.level || 1)
   const [levelBadge, setLevelBadge] = useState(user.level || user.raw?.level || 1)
+  const [liveBalance, setLiveBalance] = useState(user.token_balance || 0)
+
   useEffect(() => {
     const token = window.localStorage.getItem('sotarium_session_token') || ''
     const doFetch = async () => {
+      // 1. Fetch live level
       if (window.electronAPI?.fetchLevel) {
         const res = await window.electronAPI.fetchLevel(token)
         if (res && res.ok && res.level !== null && res.level > 0) {
           setLiveLevel(res.level)
           if (res.badge) setLevelBadge(res.badge)
-          // Also update user profile cache
           try {
             const cached = JSON.parse(window.localStorage.getItem('sotarium_user_profile') || '{}')
             cached.level = res.level
             window.localStorage.setItem('sotarium_user_profile', JSON.stringify(cached))
           } catch (e) {}
         }
+      }
+
+      // 2. Fetch live balance
+      if (window.electronAPI?.fetchBalance) {
+        const balRes = await window.electronAPI.fetchBalance(token)
+        if (balRes && balRes.ok && typeof balRes.token_balance === 'number') {
+          setLiveBalance(balRes.token_balance)
+          try {
+            const cached = JSON.parse(window.localStorage.getItem('sotarium_user_profile') || '{}')
+            cached.token_balance = balRes.token_balance
+            window.localStorage.setItem('sotarium_user_profile', JSON.stringify(cached))
+          } catch (e) {}
+        }
+      } else if (token) {
+        // Fallback direct web request
+        try {
+          const bResp = await fetch('https://rollbux.com/_api/users/me/balance', {
+            headers: { 'Authorization': `Bearer ${token}`, 'Cookie': `authjs.session-token=${token}` }
+          })
+          if (bResp.ok) {
+            const bJson = await bResp.json()
+            const b = bJson?.data?.token_balance ?? bJson?.token_balance
+            if (typeof b === 'number') setLiveBalance(b)
+          }
+        } catch (e) {}
       }
     }
     doFetch()
@@ -903,7 +946,7 @@ function RollbuxDashboard({ user, onLogout }) {
                           <p className="text-[14px] font-medium text-[#acff46]">Current Balance</p>
                           <div className="flex items-center gap-[8px]">
                             <img alt="" className="size-[24px] object-contain" src={getCurrencyIcon()} />
-                            <p className="text-[20px] font-bold text-white">{formatValue(user.token_balance)}</p>
+                            <p className="text-[20px] font-bold text-white">{formatValue(liveBalance)}</p>
                           </div>
                         </div>
                       </div>

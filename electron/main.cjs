@@ -102,16 +102,26 @@ function verifyRollbuxSession(token) {
       return resolve({ success: false, error: 'Enter a valid authjs.session-token.' })
     }
 
-    makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token }).then((res) => {
+    makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token }).then(async (res) => {
       if (res.ok && res.data) {
         const user = res.data.data?.user || res.data.data || res.data.user || res.data
         let playerLevel = extractLevelFromPayload(res.text, res.data)
+        let liveBalance = user.token_balance || 0
+
+        try {
+          const balRes = await makeRollbuxRequest({ path: '/_api/users/me/balance', method: 'GET', token })
+          if (balRes.ok && balRes.data) {
+            const b = balRes.data.data?.token_balance ?? balRes.data.token_balance
+            if (typeof b === 'number') liveBalance = b
+          }
+        } catch (e) {}
+
         resolve({
           success: true,
           user: {
             username: user.username || user.name || 'Player',
             level: playerLevel,
-            token_balance: user.token_balance || 0,
+            token_balance: liveBalance,
             avatar: user.avatar_url || user.avatar || null,
             raw: user
           }
@@ -199,6 +209,31 @@ app.whenReady().then(() => {
         }
         resolve({ ok: false, level: null })
       }).catch(() => resolve({ ok: false, level: null }))
+    })
+  })
+
+  // Fetch live token balance directly from Rollbux /_api/users/me/balance and /_api/users/me
+  ipcMain.handle('fetch-balance', async (_event, token) => {
+    return new Promise((resolve) => {
+      const trimmed = (token || '').trim()
+      makeRollbuxRequest({ path: '/_api/users/me/balance', method: 'GET', token: trimmed }).then(async (apiRes) => {
+        if (apiRes.ok && apiRes.data) {
+          const b = apiRes.data.data?.token_balance ?? apiRes.data.token_balance
+          if (typeof b === 'number') {
+            return resolve({ ok: true, token_balance: b })
+          }
+        }
+        // Fallback to /_api/users/me
+        const meRes = await makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed })
+        if (meRes.ok && meRes.data) {
+          const u = meRes.data.data?.user || meRes.data.data || meRes.data.user || meRes.data
+          const b = u?.token_balance
+          if (typeof b === 'number') {
+            return resolve({ ok: true, token_balance: b })
+          }
+        }
+        resolve({ ok: false, token_balance: null })
+      }).catch(() => resolve({ ok: false, token_balance: null }))
     })
   })
 
