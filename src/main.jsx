@@ -24,15 +24,23 @@ async function authenticateToken(token) {
       return { success: false, error: 'Authentication failed. Please check your session token.' }
     }
 
-    const data = await res.json()
+    const rawText = await res.text()
+    let data = {}
+    try { data = JSON.parse(rawText) } catch (e) {}
     const user = data.data?.user || data.data || data.user || data
+
     let playerLevel = 1
-    if (typeof user.level === 'object' && user.level !== null && user.level.currentLevel !== undefined) {
-      playerLevel = user.level.currentLevel
-    } else if (typeof user.level === 'number') {
+    const rawMatch = rawText.match(/"current_level"\s*:\s*(\d+)/i) ||
+                     rawText.match(/"currentLevel"\s*:\s*(\d+)/i) ||
+                     rawText.match(/"level"\s*:\s*(\d+)/i)
+    if (rawMatch && rawMatch[1]) {
+      playerLevel = parseInt(rawMatch[1], 10)
+    } else if (user?.current_level !== undefined) {
+      playerLevel = parseInt(user.current_level, 10)
+    } else if (typeof user?.level === 'object' && user?.level !== null) {
+      playerLevel = user.level.current_level || user.level.currentLevel || 1
+    } else if (typeof user?.level === 'number') {
       playerLevel = user.level
-    } else if (user.tier !== undefined) {
-      playerLevel = user.tier
     }
     return {
       success: true,

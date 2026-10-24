@@ -1,3 +1,29 @@
+function extractLevelFromPayload(rawText, data) {
+  if (rawText) {
+    // 1. Direct regex on raw content for current_level or currentLevel
+    const match = rawText.match(/"current_level"\s*:\s*(\d+)/i) ||
+                  rawText.match(/"currentLevel"\s*:\s*(\d+)/i) ||
+                  rawText.match(/"level"\s*:\s*(\d+)/i)
+    if (match && match[1]) {
+      const lvl = parseInt(match[1], 10)
+      if (!isNaN(lvl) && lvl > 0) return lvl
+    }
+  }
+
+  if (data) {
+    const u = data.data?.user || data.data || data.user || data
+    if (u?.current_level !== undefined && !isNaN(parseInt(u.current_level, 10))) return parseInt(u.current_level, 10)
+    if (u?.level && typeof u.level === 'object') {
+      if (u.level.current_level !== undefined) return parseInt(u.level.current_level, 10)
+      if (u.level.currentLevel !== undefined) return parseInt(u.level.currentLevel, 10)
+    }
+    if (typeof u?.level === 'number') return u.level
+    if (u?.tier !== undefined) return parseInt(u.tier, 10)
+  }
+
+  return 1
+}
+
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const https = require('https')
@@ -79,14 +105,7 @@ function verifyRollbuxSession(token) {
     makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token }).then((res) => {
       if (res.ok && res.data) {
         const user = res.data.data?.user || res.data.data || res.data.user || res.data
-        let playerLevel = 1
-        if (typeof user.level === 'object' && user.level !== null && user.level.currentLevel !== undefined) {
-          playerLevel = user.level.currentLevel
-        } else if (typeof user.level === 'number') {
-          playerLevel = user.level
-        } else if (user.tier !== undefined) {
-          playerLevel = user.tier
-        }
+        let playerLevel = extractLevelFromPayload(res.text, res.data)
         resolve({
           success: true,
           user: {
@@ -167,26 +186,15 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
-  // Fetch live player level directly from /_api/users/me: "level":{"currentLevel":38}
+  // Fetch live player level directly from raw /_api/users/me: "current_level":38
   ipcMain.handle('fetch-level', async (_event, token) => {
     return new Promise((resolve) => {
       const trimmed = (token || '').trim()
       makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
-        if (apiRes.ok && apiRes.data) {
-          const u = apiRes.data.data?.user || apiRes.data.data || apiRes.data.user || apiRes.data
-          let lvl = null
-          if (u?.level && typeof u.level === 'object' && u.level.currentLevel !== undefined) {
-            lvl = u.level.currentLevel
-          } else if (typeof u?.level === 'number') {
-            lvl = u.level
-          } else if (u?.xp_level !== undefined) {
-            lvl = u.xp_level
-          } else if (u?.tier !== undefined) {
-            lvl = u.tier
-          }
-
-          if (lvl !== null && !isNaN(parseInt(lvl, 10))) {
-            return resolve({ ok: true, level: parseInt(lvl, 10), badge: lvl })
+        if (apiRes.ok) {
+          const lvl = extractLevelFromPayload(apiRes.text, apiRes.data)
+          if (lvl && lvl > 0) {
+            return resolve({ ok: true, level: lvl, badge: lvl })
           }
         }
         resolve({ ok: false, level: null })
