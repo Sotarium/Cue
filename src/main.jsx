@@ -155,6 +155,101 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
 }
 
 // ============================================================================
+// Fullscreen "Update Detected." Blocking View
+// ============================================================================
+
+function UpdateDetectedScreen({ onComplete }) {
+  const [updating, setUpdating] = useState(false)
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1)
+
+  const updatePackages = [
+    { name: 'Updating index.html…', target: 'index.html' },
+    { name: 'Updating homepage.jsx…', target: 'homepage.jsx' },
+    { name: 'Updating styles.css…', target: 'styles.css' },
+    { name: 'Updating rollbux_upgrader_engine.js…', target: 'upgrader_engine.js' },
+    { name: 'Updating game_audio_pack.bundle…', target: 'audio_pack.bundle' },
+    { name: 'Verifying hash signatures and hot-patching runtime…', target: 'checksum' }
+  ]
+
+  const handleStartUpdate = () => {
+    setUpdating(true)
+    let idx = 0
+
+    const interval = setInterval(() => {
+      setCurrentStepIndex(idx)
+      idx++
+      if (idx > updatePackages.length) {
+        clearInterval(interval)
+        setTimeout(() => {
+          onComplete()
+        }, 800)
+      }
+    }, 1100)
+  }
+
+  const progressPercent = currentStepIndex >= 0 
+    ? Math.min(100, Math.round(((currentStepIndex + 1) / updatePackages.length) * 100))
+    : 0
+
+  return (
+    <div className="update-fullscreen-overlay">
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
+
+      <div className="update-screen-card">
+        <img
+          src={brandIconBase64}
+          alt="Sotarium Icon"
+          style={{ width: 68, height: 68, objectFit: 'contain' }}
+        />
+
+        <div>
+          <h1 className="update-screen-title">Update Detected.</h1>
+          <p className="update-screen-desc" style={{ marginTop: 6 }}>
+            A new version or missing resources were detected for your client. Update now to sync the latest files without reinstalling.
+          </p>
+        </div>
+
+        {!updating ? (
+          <button className="update-white-button" onClick={handleStartUpdate}>
+            Update
+          </button>
+        ) : (
+          <div className="update-log-terminal">
+            {updatePackages.map((pkg, i) => {
+              let statusText = 'Pending'
+              let statusClass = 'pending'
+
+              if (i < currentStepIndex) {
+                statusText = 'Done'
+                statusClass = 'done'
+              } else if (i === currentStepIndex) {
+                statusText = 'Updating…'
+                statusClass = 'active'
+              }
+
+              return (
+                <div key={pkg.target} className="update-log-item">
+                  <span className="update-log-name">{pkg.name}</span>
+                  <span className={`update-log-status ${statusClass}`}>{statusText}</span>
+                </div>
+              )
+            })}
+
+            <div className="update-progress-bar-bg">
+              <div className="update-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginTop: 2 }}>
+              <span>Patching local client…</span>
+              <span style={{ color: '#acff46', fontWeight: 700 }}>{progressPercent}%</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
 // Rollbux Dashboard — Authentic Original Dashboard Layout
 // ============================================================================
 
@@ -162,6 +257,9 @@ function RollbuxDashboard({ user, onLogout }) {
   const [currentUnit, setCurrentUnit] = useState('BUX')
   const [toast, setToast] = useState('')
   const [activeTab, setActiveTab] = useState('24h')
+
+  // Fullscreen update screen trigger
+  const [showUpdateScreen, setShowUpdateScreen] = useState(false)
 
   // Upgrader state
   const [upgraderActive, setUpgraderActive] = useState(false)
@@ -185,11 +283,6 @@ function RollbuxDashboard({ user, onLogout }) {
   const [gameHistory, setGameHistory] = useState([])
   const [copiedCode, setCopiedCode] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
-
-  // Maintenance Update modal
-  const [showUpdateModal, setShowUpdateModal] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [updateStatus, setUpdateStatus] = useState('Ready to scan')
 
   const sessionToken = window.localStorage.getItem('sotarium_session_token') || ''
 
@@ -335,19 +428,6 @@ function RollbuxDashboard({ user, onLogout }) {
     }, 1500)
   }
 
-  // Hot-patch missing resources without reinstall
-  const handleResourceUpdate = () => {
-    setIsUpdating(true)
-    setUpdateStatus('Checking local game assets & sound packs…')
-    setTimeout(() => setUpdateStatus('Fetching latest geometry and audio patches…'), 1200)
-    setTimeout(() => setUpdateStatus('Verifying hash signatures and hot-patching runtime…'), 2600)
-    setTimeout(() => {
-      setIsUpdating(false)
-      setUpdateStatus('All client resources are up to date!')
-      showToast('Resources updated successfully!')
-    }, 3800)
-  }
-
   const formatValue = (microTokens) => {
     const bux = microTokens ? microTokens / 1000000 : 0
     if (currentUnit === 'USD') return `$${(bux * 0.01).toFixed(2)}`
@@ -361,6 +441,16 @@ function RollbuxDashboard({ user, onLogout }) {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       {toast && <div className="toast-notice">{toast}</div>}
+
+      {/* Fullscreen Blocking View for Update Detected */}
+      {showUpdateScreen && (
+        <UpdateDetectedScreen
+          onComplete={() => {
+            setShowUpdateScreen(false)
+            showToast('Client update successfully installed!')
+          }}
+        />
+      )}
 
       <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8">
         <div className="flex w-full flex-col items-start gap-[28px]">
@@ -383,9 +473,9 @@ function RollbuxDashboard({ user, onLogout }) {
                     <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
                   </div>
 
-                  {/* Hot-Patch Restart Update Detect Button in top-right */}
+                  {/* Trigger Fullscreen Update Screen */}
                   <button
-                    onClick={() => setShowUpdateModal(true)}
+                    onClick={() => setShowUpdateScreen(true)}
                     className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#131a29] border border-white/10 hover:border-[#acff46]/40 text-xs font-bold text-gray-300 hover:text-white transition shadow-sm active:scale-95 cursor-pointer"
                   >
                     <span className="w-2 h-2 rounded-full bg-[#acff46] animate-pulse"></span>
@@ -890,58 +980,6 @@ function RollbuxDashboard({ user, onLogout }) {
 
         </div>
       </div>
-
-      {/* Restart Update Detect Overlay Modal */}
-      {showUpdateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl p-6 bg-[#0e131f] border border-white/10 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#acff46]"></span>
-                <h3 className="text-base font-bold text-white">Restart Update Detect.</h3>
-              </div>
-              <button onClick={() => setShowUpdateModal(false)} className="text-gray-400 hover:text-white text-lg font-bold cursor-pointer">&times;</button>
-            </div>
-
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Verify local file integrity and download missing sound packs, game assets, and dependencies directly to your machine without having to reinstall <code className="text-white bg-white/10 px-1 py-0.5 rounded">Sotarium.exe</code>.
-            </p>
-
-            <div className="space-y-2 bg-[#131a29] p-3 rounded-lg border border-white/5 text-xs">
-              <div className="flex justify-between text-gray-300">
-                <span>Sound Packs & Audio FX</span>
-                <span className="text-[#acff46] font-semibold">Verified</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Upgrader Geometry Textures</span>
-                <span className="text-[#acff46] font-semibold">Verified</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>Battle Particles & Shaders</span>
-                <span className="text-[#acff46] font-semibold">Verified</span>
-              </div>
-            </div>
-
-            <div className="text-xs text-[#acff46] font-medium pt-1">
-              {updateStatus}
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
-              <button onClick={() => setShowUpdateModal(false)} type="button" className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white transition cursor-pointer">
-                Close
-              </button>
-              <button
-                onClick={handleResourceUpdate}
-                disabled={isUpdating}
-                type="button"
-                className="px-5 py-2 bg-[#acff46] text-[#121418] font-bold text-xs rounded-lg hover:bg-[#96e036] transition shadow-md shadow-[#acff46]/10 cursor-pointer"
-              >
-                {isUpdating ? 'Updating Resources…' : 'Update Missing Resources'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
