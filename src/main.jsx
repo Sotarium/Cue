@@ -640,9 +640,9 @@ function RollbuxDashboard({ user, onLogout }) {
                       <div className="flex items-center gap-3">
                         <div className="flex gap-1 bg-[#131a29] p-1 rounded-md border border-white/[0.04]">
                           {[
-                            { id: 'BUX', icon: '/figma/token-bux.png' },
-                            { id: 'USD', icon: '/figma/token-usd.svg' },
-                            { id: 'SOL', icon: '/figma/af-coin-24.svg' },
+                            { id: 'BUX', icon: './figma/token-bux.png' },
+                            { id: 'USD', icon: './figma/token-usd.svg' },
+                            { id: 'SOL', icon: './figma/af-coin-24.svg' },
                           ].map(({ id, icon }) => (
                             <button key={id} onClick={() => setCurrentUnit(id)} type="button"
                               className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === id ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
@@ -666,7 +666,7 @@ function RollbuxDashboard({ user, onLogout }) {
                       <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
                         <p className="text-[14px] font-medium text-[#9aa3a8]">Total Earnings</p>
                         <div className="flex items-center gap-[8px]">
-                          <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
+                          <img alt="" className="size-[24px]" src="./figma/af-coin-24.svg" />
                           <p className="text-[20px] font-bold text-white">0.00</p>
                         </div>
                       </div>
@@ -674,7 +674,7 @@ function RollbuxDashboard({ user, onLogout }) {
                         <div className="flex min-w-0 flex-col gap-[6px]">
                           <p className="text-[14px] font-medium text-[#acff46]">Current Balance</p>
                           <div className="flex items-center gap-[8px]">
-                            <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
+                            <img alt="" className="size-[24px]" src="./figma/af-coin-24.svg" />
                             <p className="text-[20px] font-bold text-white">{formatValue(user.token_balance)}</p>
                           </div>
                         </div>
