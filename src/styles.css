@@ -478,3 +478,5 @@ h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 44px); line-height: 1.04; l
 .auth-switch { margin: 19px 0 0; color: #6d7680; text-align: center; font-size: 11px; }
 .auth-switch button { padding: 0; color: #acff46; background: transparent; font-size: inherit; }
 .auth-switch button:hover { text-decoration: underline; }
+
+.auth-switch-link { width: 100%; cursor: pointer; }

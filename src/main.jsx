@@ -215,7 +215,7 @@ function CreateModal({ onClose, onCreate }) {
 }
 
 function DownloadPage() {
-  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://github.com/Sotarium/Cue/releases/latest/download/Sotarium.exe">Download for Windows</a><a className="store-link" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Microsoft Store</a></div></main>
+  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://github.com/Sotarium/Cue/releases/latest/download/Sotarium.exe">Download for Windows</a></div></main>
 }
 
 function AuthPage({ onComplete }) {
@@ -236,6 +236,10 @@ function AuthPage({ onComplete }) {
     setBusy(true)
     window.setTimeout(() => {
       const saved = JSON.parse(window.localStorage.getItem('sotarium_account') || 'null')
+      if (isSignup && saved && saved.identifier.toLowerCase() === cleanIdentifier.toLowerCase()) {
+        setBusy(false)
+        return setError('You already have an account. Please log in instead.')
+      }
       if (!isSignup && (!saved || saved.identifier.toLowerCase() !== cleanIdentifier.toLowerCase() || saved.password !== password)) {
         setBusy(false)
         return setError('That login did not work. Create an account first or check your details.')
@@ -247,7 +251,7 @@ function AuthPage({ onComplete }) {
     }, 260)
   }
   const setIdentifierKind = (next) => { setIdentifierMode(next); setIdentifier(''); setError('') }
-  return <main className="auth-page"><section className="auth-card"><header className="auth-header"><div className="auth-logo-stack"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>{isSignup ? 'Sign up' : 'Log in'}</h1></header><form className="auth-form" onSubmit={submit}><div className="auth-field"><div className="auth-label-row"><label htmlFor="auth-identifier">{identifierMode === 'email' ? 'Email' : 'Username'}</label><div className="auth-mode-toggle"><button type="button" className={identifierMode === 'username' ? 'selected' : ''} onClick={() => setIdentifierKind('username')}>Username</button><button type="button" className={identifierMode === 'email' ? 'selected' : ''} onClick={() => setIdentifierKind('email')}>Email</button></div></div><input id="auth-identifier" value={identifier} onChange={event => setIdentifier(event.target.value)} type={identifierMode === 'email' ? 'email' : 'text'} autoComplete={identifierMode === 'email' ? 'email' : 'username'} placeholder={identifierMode === 'email' ? 'you@example.com' : 'Choose a username'} /></div><label className="auth-field"><span>Password <small>(5+ characters)</small></span><input value={password} onChange={event => setPassword(event.target.value)} type="password" autoComplete={isSignup ? 'new-password' : 'current-password'} /></label>{error && <p className="auth-error">{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}</button></form><p className="auth-switch">{isSignup ? 'Already have an account?' : 'Need an account?'} <button type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setError('') }}>{isSignup ? 'Log in' : 'Sign up'}</button></p></section></main>
+  return <main className="auth-page"><section className="auth-card"><header className="auth-header"><div className="auth-logo-stack"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>{isSignup ? 'Sign up' : 'Log in'}</h1></header><form className="auth-form" onSubmit={submit}><div className="auth-field"><div className="auth-label-row"><label htmlFor="auth-identifier">{identifierMode === 'email' ? 'Email' : 'Username'}</label><div className="auth-mode-toggle"><button type="button" className={identifierMode === 'username' ? 'selected' : ''} onClick={() => setIdentifierKind('username')}>Username</button><button type="button" className={identifierMode === 'email' ? 'selected' : ''} onClick={() => setIdentifierKind('email')}>Email</button></div></div><input id="auth-identifier" value={identifier} onChange={event => setIdentifier(event.target.value)} type={identifierMode === 'email' ? 'email' : 'text'} autoComplete={identifierMode === 'email' ? 'email' : 'username'} placeholder={identifierMode === 'email' ? 'you@example.com' : 'Choose a username'} /></div><label className="auth-field"><span>Password <small>(5+ characters)</small></span><input value={password} onChange={event => setPassword(event.target.value)} type="password" autoComplete={isSignup ? 'new-password' : 'current-password'} /></label>{error && <p className="auth-error">{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}</button></form><button className="auth-switch auth-switch-link" type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setIdentifier(''); setPassword(''); setError('') }}>{isSignup ? 'Already have an account? Log in' : 'Need an account? Sign up'}</button></section></main>
 }
 
 const conversationSeeds = [
