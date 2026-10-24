@@ -303,6 +303,21 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
+  // Live level polling — scrape /profile every 60 seconds
+  const [liveLevel, setLiveLevel] = useState(user.level)
+  useEffect(() => {
+    const token = window.localStorage.getItem('sotarium_session_token') || ''
+    const doFetch = async () => {
+      if (window.electronAPI?.fetchLevel) {
+        const res = await window.electronAPI.fetchLevel(token)
+        if (res.ok && res.level !== null) setLiveLevel(res.level)
+      }
+    }
+    doFetch()
+    const interval = setInterval(doFetch, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
   const handleCopyCode = () => {
     navigator.clipboard.writeText(user.username)
     setCopiedCode(true)
@@ -453,41 +468,42 @@ function RollbuxDashboard({ user, onLogout }) {
         </div>
 
         {/* Nav items */}
-        {[
-          { id: 'home', label: 'Home', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> },
-          { id: 'automations', label: 'Automations', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> },
-          { id: 'rains', label: 'Rains', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg> },
-        ].map(item => (
+        {['home', 'automations', 'rains'].map(id => (
           <button
-            key={item.id}
+            key={id}
             type="button"
-            onClick={() => setSideTab(item.id)}
+            onClick={() => setSideTab(id)}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 700,
               cursor: 'pointer', width: '100%', textAlign: 'left', transition: 'all 0.15s',
-              background: sideTab === item.id ? '#131a29' : 'transparent',
-              color: sideTab === item.id ? '#fff' : '#9aa3a8',
-              border: sideTab === item.id ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
+              background: sideTab === id ? '#131a29' : 'transparent',
+              color: sideTab === id ? '#fff' : '#9aa3a8',
+              border: sideTab === id ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
             }}
           >
-            <span style={{ color: sideTab === item.id ? '#acff46' : 'inherit', display: 'flex' }}>{item.icon}</span>
-            {item.label}
-            {sideTab === item.id && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'block' }} />}
+            {id.charAt(0).toUpperCase() + id.slice(1)}
+            {sideTab === id && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'block' }} />}
           </button>
         ))}
 
         {/* Spacer */}
         <div style={{ flex: 1 }} />
 
-        {/* User card */}
-        <div style={{ padding: '10px 12px', borderRadius: 12, background: '#131a29', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
-            <span style={{ fontSize: 10, color: '#9aa3a8' }}>Lvl {user.level}</span>
+        {/* User card + logout */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <button onClick={onLogout} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171', fontSize: 11, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
+            <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+            Log Out
+          </button>
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: '#131a29', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
+              <span style={{ fontSize: 10, color: '#9aa3a8' }}>Lvl {liveLevel}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -501,45 +517,26 @@ function RollbuxDashboard({ user, onLogout }) {
             <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
 
               {/* Header */}
-              <div className="flex w-full shrink-0 flex-wrap items-center gap-[12px]">
-                <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    Log Out
-                  </button>
-                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
-                </div>
-              </div>
+              <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
 
-              {/* Body: left sidebar + right content */}
-              <div className="flex w-full flex-col items-start gap-[24px] lg:flex-row lg:gap-[28px]">
-
-                {/* Left sidebar */}
-                <div className="flex w-full shrink-0 flex-col items-start gap-[16px] lg:w-[300px] xl:w-[320px]">
-
-
-                  {/* Currency switcher */}
-                  <div className="w-full flex items-center justify-between bg-[#0e131f] p-3 rounded-[12px] border border-white/[0.03] text-[12px]">
-                    <span className="text-[#9aa3a8] font-medium">Display Unit:</span>
-                    <div className="flex gap-1 bg-[#131a29] p-1 rounded-md">
-                      {['BUX', 'USD', 'SOL'].map(unit => (
-                        <button key={unit} onClick={() => setCurrentUnit(unit)} type="button"
-                          className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === unit ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
-                          {unit}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right content: Overview + Stats */}
-                <div className="flex flex-1 min-w-0 w-full flex-col items-start gap-[24px]">
+                {/* Content */}
+                <div className="flex w-full flex-col items-start gap-[24px]">
 
                   {/* Overview */}
                   <div className="flex w-full flex-col gap-[16px]">
-                    <div className="flex w-full items-center justify-between">
+                    <div className="flex w-full items-center justify-between gap-3">
                       <p className="text-[20px] font-bold italic text-white">Overview</p>
-                      <button onClick={() => showToast('Overview metrics reset')} type="button" className="flex h-[32px] items-center justify-center rounded-[7px] px-[14px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1 bg-[#131a29] p-1 rounded-md border border-white/[0.04]">
+                          {['BUX', 'USD', 'SOL'].map(unit => (
+                            <button key={unit} onClick={() => setCurrentUnit(unit)} type="button"
+                              className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === unit ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
+                              {unit}
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={() => showToast('Overview metrics reset')} type="button" className="flex h-[32px] items-center justify-center rounded-[7px] px-[14px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] w-full">
                       <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
@@ -640,7 +637,6 @@ function RollbuxDashboard({ user, onLogout }) {
                   </div>
 
                 </div>
-              </div>
             </div>
           </div>
         )}
@@ -650,10 +646,7 @@ function RollbuxDashboard({ user, onLogout }) {
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
             <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
               <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 cursor-pointer">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  Log Out
-                </button>
+
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Automations</h1>
               </div>
 
@@ -796,10 +789,7 @@ function RollbuxDashboard({ user, onLogout }) {
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
             <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
               <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 cursor-pointer">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  Log Out
-                </button>
+
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
               </div>
               <div className="flex w-full flex-col gap-[16px]">

@@ -159,6 +159,41 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
+  // Fetch live player level by scraping /profile page HTML
+  ipcMain.handle('fetch-level', async (_event, token) => {
+    return new Promise((resolve) => {
+      const trimmed = (token || '').trim()
+      const options = {
+        hostname: 'rollbux.com',
+        port: 443,
+        path: '/profile',
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Cookie': `authjs.session-token=${trimmed}`,
+          'Referer': 'https://rollbux.com/',
+        }
+      }
+      const req = https.request(options, (res) => {
+        let html = ''
+        res.on('data', (chunk) => { html += chunk })
+        res.on('end', () => {
+          // Match: <span class="relative z-10 text-shadow-lg mt-px">NUMBER</span>
+          const match = html.match(/<span class="relative z-10 text-shadow-lg mt-px">(\d+)<\/span>/)
+          if (match) {
+            resolve({ ok: true, level: parseInt(match[1], 10) })
+          } else {
+            resolve({ ok: false, level: null })
+          }
+        })
+      })
+      req.on('error', () => resolve({ ok: false, level: null }))
+      req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, level: null }) })
+      req.end()
+    })
+  })
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
