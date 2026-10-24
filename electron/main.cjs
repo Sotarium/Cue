@@ -79,11 +79,19 @@ function verifyRollbuxSession(token) {
     makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token }).then((res) => {
       if (res.ok && res.data) {
         const user = res.data.data?.user || res.data.data || res.data.user || res.data
+        let playerLevel = 1
+        if (typeof user.level === 'object' && user.level !== null && user.level.currentLevel !== undefined) {
+          playerLevel = user.level.currentLevel
+        } else if (typeof user.level === 'number') {
+          playerLevel = user.level
+        } else if (user.tier !== undefined) {
+          playerLevel = user.tier
+        }
         resolve({
           success: true,
           user: {
             username: user.username || user.name || 'Player',
-            level: user.level !== undefined ? user.level : (user.tier || 1),
+            level: playerLevel,
             token_balance: user.token_balance || 0,
             avatar: user.avatar_url || user.avatar || null,
             raw: user
@@ -159,58 +167,30 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
-  // Fetch live player level: check /profile HTML, /_api/users/me, and next-data
+  // Fetch live player level directly from /_api/users/me: "level":{"currentLevel":38}
   ipcMain.handle('fetch-level', async (_event, token) => {
     return new Promise((resolve) => {
       const trimmed = (token || '').trim()
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Cookie': `authjs.session-token=${trimmed}`,
-        'Origin': 'https://rollbux.com',
-        'Referer': 'https://rollbux.com/',
-      }
-
-      const req = https.request({
-        hostname: 'rollbux.com',
-        port: 443,
-        path: '/profile',
-        method: 'GET',
-        headers
-      }, (res) => {
-        let html = ''
-        res.on('data', (chunk) => { html += chunk })
-        res.on('end', () => {
-          // 1. Check for specific level badge classes and span contents
-          const spanMatch = html.match(/class="[^"]*(?:text-shadow-lg|mt-px)[^"]*"[^>]*>\s*(\d+)\s*<\/span>/i) ||
-                            html.match(/--level-color:var\(--level-badge-(\d+)\)/i) ||
-                            html.match(/--level-badge-(\d+)/i) ||
-                            html.match(/"level"\s*:\s*(\d+)/i)
-
-          if (spanMatch && spanMatch[1]) {
-            const num = parseInt(spanMatch[1], 10)
-            if (!isNaN(num) && num > 0) {
-              return resolve({ ok: true, level: num, badge: num })
-            }
+      makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
+        if (apiRes.ok && apiRes.data) {
+          const u = apiRes.data.data?.user || apiRes.data.data || apiRes.data.user || apiRes.data
+          let lvl = null
+          if (u?.level && typeof u.level === 'object' && u.level.currentLevel !== undefined) {
+            lvl = u.level.currentLevel
+          } else if (typeof u?.level === 'number') {
+            lvl = u.level
+          } else if (u?.xp_level !== undefined) {
+            lvl = u.xp_level
+          } else if (u?.tier !== undefined) {
+            lvl = u.tier
           }
 
-          // 2. Query /_api/users/me
-          makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
-            if (apiRes.ok && apiRes.data) {
-              const u = apiRes.data.data?.user || apiRes.data.data || apiRes.data.user || apiRes.data
-              const lvl = u?.level ?? u?.xp_level ?? u?.tier ?? null
-              if (lvl !== null && lvl !== undefined && parseInt(lvl, 10) > 0) {
-                return resolve({ ok: true, level: parseInt(lvl, 10), badge: lvl })
-              }
-            }
-            resolve({ ok: false, level: null })
-          }).catch(() => resolve({ ok: false, level: null }))
-        })
-      })
-
-      req.on('error', () => resolve({ ok: false, level: null }))
-      req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, level: null }) })
-      req.end()
+          if (lvl !== null && !isNaN(parseInt(lvl, 10))) {
+            return resolve({ ok: true, level: parseInt(lvl, 10), badge: lvl })
+          }
+        }
+        resolve({ ok: false, level: null })
+      }).catch(() => resolve({ ok: false, level: null }))
     })
   })
 

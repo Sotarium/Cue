@@ -26,11 +26,19 @@ async function authenticateToken(token) {
 
     const data = await res.json()
     const user = data.data?.user || data.data || data.user || data
+    let playerLevel = 1
+    if (typeof user.level === 'object' && user.level !== null && user.level.currentLevel !== undefined) {
+      playerLevel = user.level.currentLevel
+    } else if (typeof user.level === 'number') {
+      playerLevel = user.level
+    } else if (user.tier !== undefined) {
+      playerLevel = user.tier
+    }
     return {
       success: true,
       user: {
         username: user.username || user.name || 'Player',
-        level: user.level !== undefined ? user.level : (user.tier || 1),
+        level: playerLevel,
         token_balance: user.token_balance || 0,
         avatar: user.avatar_url || user.avatar || null,
         raw: user
@@ -237,6 +245,125 @@ function UpdateDetectedScreen({ onComplete }) {
         )}
       </div>
     </div>
+  )
+}
+
+function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, formatBuxValue }) {
+  const [hoveredPoint, setHoveredPoint] = useState(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  const handleMouseMove = (e) => {
+    if (!chartPoints || chartPoints.length < 2) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const svgRatio = width / rect.width
+    const targetSvgX = mouseX * svgRatio
+
+    let closest = chartPoints[0]
+    let minDist = Infinity
+    for (const pt of chartPoints) {
+      const dist = Math.abs(pt.x - targetSvgX)
+      if (dist < minDist) {
+        minDist = dist
+        closest = pt
+      }
+    }
+
+    const pointPixelX = (closest.x / width) * rect.width
+    const pointPixelY = (closest.y / height) * rect.height
+    setHoveredPoint(closest)
+    setTooltipPos({ x: pointPixelX, y: Math.max(10, pointPixelY - 55) })
+  }
+
+  const handleMouseLeave = () => {
+    setHoveredPoint(null)
+  }
+
+  return (
+    <>
+      <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] text-[12px] font-bold text-[#6d7680] select-none">
+        <p>{formatBuxValue(maxVal)}</p>
+        <p>{formatBuxValue(maxVal * 0.75)}</p>
+        <p>{formatBuxValue(maxVal * 0.50)}</p>
+        <p>{formatBuxValue(maxVal * 0.25)}</p>
+        <p className="text-white font-bold">{formatBuxValue(0)}</p>
+      </div>
+
+      <div
+        className="absolute cursor-crosshair"
+        style={{ left: 68, top: 9, width: 'calc(100% - 68px)', height: 330 }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+      >
+        <svg className="absolute inset-0 size-full pointer-events-none" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#7974FF" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#7974FF" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="20" x2={width} y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+          <line x1="0" y1="100" x2={width} y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+          <line x1="0" y1="180" x2={width} y2="180" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+          <line x1="0" y1="260" x2={width} y2="260" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+          
+          <path d={fillD} fill="url(#chartGradient)" />
+          <path d={pathD} fill="none" stroke="#7974FF" strokeWidth="2.5" />
+
+          {/* Hover Crosshair & Indicator */}
+          {hoveredPoint && (
+            <>
+              <line
+                x1={hoveredPoint.x}
+                y1="0"
+                x2={hoveredPoint.x}
+                y2={height}
+                stroke="#ffffff"
+                strokeWidth="1.5"
+                strokeDasharray="4 4"
+                opacity="0.4"
+              />
+              <circle
+                cx={hoveredPoint.x}
+                cy={hoveredPoint.y}
+                r="10"
+                fill="#7974FF"
+                opacity="0.25"
+              />
+              <circle
+                cx={hoveredPoint.x}
+                cy={hoveredPoint.y}
+                r="5"
+                fill="#ffffff"
+                stroke="#7974FF"
+                strokeWidth="2.5"
+              />
+            </>
+          )}
+        </svg>
+
+        {/* Floating Tooltip */}
+        {hoveredPoint && (
+          <div
+            className="pointer-events-none absolute z-20 flex flex-col items-start gap-1 rounded-lg bg-[#121622] border border-white/10 px-2.5 py-1.5 shadow-2xl transition-all duration-75 transform -translate-x-1/2 select-none"
+            style={{ left: tooltipPos.x, top: tooltipPos.y }}
+          >
+            <span className="text-[11px] font-semibold text-[#9aa3a8] leading-none">{hoveredPoint.time}</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <img src="./figma/token-bux.png" alt="Coin" className="size-3.5 object-contain" />
+              <span className="text-[13px] font-black text-white font-mono leading-none">
+                {formatBuxValue(hoveredPoint.cumulative)}
+              </span>
+            </div>
+            {hoveredPoint.earning > 0 && (
+              <span className="text-[10px] font-bold text-[#50f07b] leading-none">
+                +{formatBuxValue(hoveredPoint.earning)}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -797,57 +924,45 @@ function RollbuxDashboard({ user, onLogout }) {
                       <div className="custom-scroll relative h-[348px] w-full overflow-x-auto overflow-y-clip">
                         <div className="relative h-full w-full min-w-[500px]">
                           {(() => {
-                            // Compute dynamic points from rain transactions
                             const sortedTxs = [...rainTxs].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
                             let cumulative = 0
-                            const points = sortedTxs.map(t => {
+                            const pointsData = sortedTxs.map(t => {
                               cumulative += (t.amount_bux || 0)
-                              return cumulative
+                              return {
+                                cumulative,
+                                earning: t.amount_bux || 0,
+                                time: t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Rain'
+                              }
                             })
 
-                            const maxVal = Math.max(10, Math.ceil((Math.max(...points, 0) || 10) * 1.15))
+                            if (pointsData.length < 2) {
+                              pointsData.unshift({ cumulative: 0, earning: 0, time: 'Start' })
+                            }
+
+                            const maxVal = Math.max(10, Math.ceil((Math.max(...pointsData.map(p => p.cumulative), 0) || 10) * 1.15))
                             const width = 744
                             const height = 330
 
-                            let pathD = 'M 0 330 L 744 330'
-                            let fillD = 'M 0 330 L 744 330 L 744 330 L 0 330 Z'
+                            const chartPoints = pointsData.map((p, idx) => {
+                              const x = (idx / (pointsData.length - 1)) * width
+                              const y = height - (p.cumulative / maxVal) * (height - 45) - 15
+                              return { ...p, x, y }
+                            })
 
-                            if (points.length >= 2) {
-                              const coords = points.map((val, idx) => {
-                                const x = (idx / (points.length - 1)) * width
-                                const y = height - (val / maxVal) * (height - 45) - 15
-                                return `${x.toFixed(1)},${y.toFixed(1)}`
-                              })
-                              pathD = 'M ' + coords.join(' L ')
-                              fillD = `M 0,${height} L ` + coords.join(' L ') + ` L ${width},${height} Z`
-                            }
+                            const coords = chartPoints.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+                            const pathD = 'M ' + coords.join(' L ')
+                            const fillD = `M 0,${height} L ` + coords.join(' L ') + ` L ${width},${height} Z`
 
                             return (
-                              <>
-                                <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] text-[12px] font-bold text-[#6d7680]">
-                                  <p>{formatBuxValue(maxVal)}</p>
-                                  <p>{formatBuxValue(maxVal * 0.75)}</p>
-                                  <p>{formatBuxValue(maxVal * 0.50)}</p>
-                                  <p>{formatBuxValue(maxVal * 0.25)}</p>
-                                  <p className="text-white font-bold">{formatBuxValue(0)}</p>
-                                </div>
-                                <div className="absolute cursor-crosshair" style={{ left: 68, top: 9, width: 'calc(100% - 68px)', height: 330 }}>
-                                  <svg className="absolute inset-0 size-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-                                    <defs>
-                                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#7974FF" stopOpacity="0.25" />
-                                        <stop offset="100%" stopColor="#7974FF" stopOpacity="0.0" />
-                                      </linearGradient>
-                                    </defs>
-                                    <line x1="0" y1="20" x2={width} y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                    <line x1="0" y1="100" x2={width} y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                    <line x1="0" y1="180" x2={width} y2="180" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                    <line x1="0" y1="260" x2={width} y2="260" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                    <path d={fillD} fill="url(#chartGradient)" />
-                                    <path d={pathD} fill="none" stroke="#7974FF" strokeWidth="2.5" />
-                                  </svg>
-                                </div>
-                              </>
+                              <InteractiveGraph
+                                maxVal={maxVal}
+                                width={width}
+                                height={height}
+                                fillD={fillD}
+                                pathD={pathD}
+                                chartPoints={chartPoints}
+                                formatBuxValue={formatBuxValue}
+                              />
                             )
                           })()}
                         </div>
