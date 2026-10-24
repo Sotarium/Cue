@@ -335,101 +335,212 @@ function RollbuxDashboard({ user, onLogout }) {
   // Upgrader execution
   const executeUpgraderPlay = async () => {
     setUpgraderFeedback('Upgrading...')
-    showToast(`Upgrading with ${upgraderMultiplier}x target...`)
-    if (window.electronAPI?.rollbuxRequest) {
-      try {
-        const res = await window.electronAPI.rollbuxRequest({
-          path: '/_api/upgrader/play',
-          method: 'POST',
-          token: sessionToken,
-          body: {
-            multiplier: upgraderMultiplier,
-            randomPosition: upgraderRandom,
-            autoSell: upgraderAutoSell,
-            stakeValueMicroTokens: 1000000
-          }
-        })
-        if (res.ok) {
-          setUpgraderFeedback('Won Item! (Sold)')
-          showToast('Upgrade play completed!')
-          setGameHistory(prev => [{
-            mode: 'Upgrader',
-            success: true,
-            account: user.username,
-            amount: (upgraderMultiplier * 1.0).toFixed(2),
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }, ...prev])
-        } else {
-          setUpgraderFeedback('Lost')
-          showToast(res.data?.message || 'Upgrade rejected by Rollbux')
-          setGameHistory(prev => [{
-            mode: 'Upgrader',
-            success: false,
-            account: user.username,
-            amount: '1.00',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }, ...prev])
+    try {
+      const res = await window.electronAPI.backendCall({
+        endpoint: '/api/upgrader/play',
+        method: 'POST',
+        body: {
+          username: user.username,
+          multiplier: upgraderMultiplier,
+          randomPosition: upgraderRandom,
+          autoSell: upgraderAutoSell,
         }
-      } catch (e) {
-        setUpgraderFeedback('Error')
-        showToast('Error executing upgrade')
+      })
+      if (res.ok && res.data?.success) {
+        const d = res.data
+        const won = d.won
+        const payout = d.newBalanceBux ?? d.stakeBux ?? 0
+        setUpgraderFeedback(won ? `Won! +${Number(payout).toFixed(2)} BUX` : 'Lost — no upgrade')
+        showToast(won ? `Upgrader won! Auto-sold for ${Number(payout).toFixed(2)} BUX` : 'Upgrader: no win this round')
+        setGameHistory(prev => [{
+          mode: 'Upgrader',
+          success: won,
+          account: user.username,
+          amount: Number(payout).toFixed(2),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
+      } else {
+        const msg = res.data?.error || res.data?.message || `Error ${res.statusCode}`
+        setUpgraderFeedback(`Error: ${msg}`)
+        showToast(`Upgrader error: ${msg}`)
       }
+    } catch (e) {
+      setUpgraderFeedback('Error')
+      showToast('Upgrader: network error')
     }
   }
 
   // Battle execution
   const executeBattleCreate = async () => {
     setBattleFeedback('Creating 3v3 battle...')
-    showToast('Creating 3v3 Battle...')
-    if (window.electronAPI?.rollbuxRequest) {
-      try {
-        const res = await window.electronAPI.rollbuxRequest({
-          path: '/_api/battles',
-          method: 'POST',
-          token: sessionToken,
-          body: {
-            borrow: battleBorrow,
-            crazy_mode: battleCrazy,
-            mode: '3v3'
-          }
-        })
-        if (res.ok) {
-          setBattleFeedback('Battle created!')
-          showToast('3v3 Battle created!')
-          setGameHistory(prev => [{
-            mode: 'Battle',
-            success: true,
-            account: user.username,
-            amount: '57.60',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }, ...prev])
-        } else {
-          setBattleFeedback('Failed')
-          showToast(res.data?.message || 'Battle creation rejected')
+    try {
+      const res = await window.electronAPI.backendCall({
+        endpoint: '/api/battles/create',
+        method: 'POST',
+        body: {
+          username: user.username,
+          borrow: battleBorrow,
+          crazy_mode: battleCrazy,
         }
-      } catch (e) {
-        setBattleFeedback('Error')
-        showToast('Error creating battle')
+      })
+      if (res.ok && res.data?.success) {
+        const d = res.data
+        const cost = d.actualPaidBux ?? d.totalCostBux ?? 0
+        setBattleFeedback(`Battle #${d.battle_id} created! Cost: ${Number(cost).toFixed(2)} BUX`)
+        showToast(`3v3 Battle created! ID #${d.battle_id}`)
+        setGameHistory(prev => [{
+          mode: 'Battle',
+          success: true,
+          account: user.username,
+          amount: Number(cost).toFixed(2),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
+      } else {
+        const msg = res.data?.error || res.data?.message || `Error ${res.statusCode}`
+        setBattleFeedback(`Error: ${msg}`)
+        showToast(`Battle error: ${msg}`)
+        setGameHistory(prev => [{
+          mode: 'Battle',
+          success: false,
+          account: user.username,
+          amount: '0.00',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
       }
+    } catch (e) {
+      setBattleFeedback('Error')
+      showToast('Battle: network error')
     }
   }
 
-  // Mines execution
-  const executeMinesPlay = () => {
-    setMinesFeedback('Playing mines...')
-    showToast('Executing Mines round...')
-    setTimeout(() => {
-      setMinesFeedback('Success! +1.10 BUX')
-      showToast('Mines round cashed out successfully!')
-      setGameHistory(prev => [{
-        mode: 'Mines',
-        success: true,
-        account: user.username,
-        amount: '1.10',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }, ...prev])
-    }, 1500)
+  // Mines execution — 3-step flow: start → reveal tiles → cashout
+  const executeMinesPlay = async () => {
+    setMinesFeedback('Starting mines...')
+    try {
+      // Step 1: Start game with 50 BUX, 1 mine
+      const startRes = await window.electronAPI.backendCall({
+        endpoint: '/api/mines/start',
+        method: 'POST',
+        body: { username: user.username, amount_micro_tokens: 50000000, number_of_mines: 1 }
+      })
+      if (!startRes.ok || !startRes.data?.success) {
+        const msg = startRes.data?.error || startRes.data?.message || `Error ${startRes.statusCode}`
+        setMinesFeedback(`Start error: ${msg}`)
+        showToast(`Mines start error: ${msg}`)
+        return
+      }
+
+      // Step 2: Reveal tile 0 (safe corner)
+      setMinesFeedback('Revealing tile 0...')
+      const rev1 = await window.electronAPI.backendCall({
+        endpoint: '/api/mines/reveal',
+        method: 'POST',
+        body: { username: user.username, tile_index: 0 }
+      })
+      if (!rev1.ok || !rev1.data?.success || rev1.data?.exploded) {
+        const msg = rev1.data?.exploded ? 'Exploded on tile 0!' : (rev1.data?.error || `Error ${rev1.statusCode}`)
+        setMinesFeedback(msg)
+        showToast(`Mines: ${msg}`)
+        setGameHistory(prev => [{
+          mode: 'Mines',
+          success: false,
+          account: user.username,
+          amount: '50.00',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
+        return
+      }
+
+      // Step 3: Reveal tile 5 (second safe spot)
+      setMinesFeedback('Revealing tile 5...')
+      const rev2 = await window.electronAPI.backendCall({
+        endpoint: '/api/mines/reveal',
+        method: 'POST',
+        body: { username: user.username, tile_index: 5 }
+      })
+      if (!rev2.ok || !rev2.data?.success || rev2.data?.exploded) {
+        const msg = rev2.data?.exploded ? 'Exploded on tile 5!' : (rev2.data?.error || `Error ${rev2.statusCode}`)
+        setMinesFeedback(msg)
+        showToast(`Mines: ${msg}`)
+        setGameHistory(prev => [{
+          mode: 'Mines',
+          success: false,
+          account: user.username,
+          amount: '50.00',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
+        return
+      }
+
+      // Step 4: Cashout
+      setMinesFeedback('Cashing out...')
+      const cashRes = await window.electronAPI.backendCall({
+        endpoint: '/api/mines/cashout',
+        method: 'POST',
+        body: { username: user.username }
+      })
+      if (cashRes.ok && cashRes.data?.success) {
+        const payout = cashRes.data?.payout_bux ?? 0
+        setMinesFeedback(`Cashed out! +${Number(payout).toFixed(2)} BUX`)
+        showToast(`Mines cashed out! +${Number(payout).toFixed(2)} BUX`)
+        setGameHistory(prev => [{
+          mode: 'Mines',
+          success: true,
+          account: user.username,
+          amount: Number(payout).toFixed(2),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }, ...prev])
+      } else {
+        const msg = cashRes.data?.error || cashRes.data?.message || `Error ${cashRes.statusCode}`
+        setMinesFeedback(`Cashout error: ${msg}`)
+        showToast(`Mines cashout error: ${msg}`)
+      }
+    } catch (e) {
+      setMinesFeedback('Error')
+      showToast('Mines: network error')
+    }
   }
+
+
+  // Auto-loop: when active flags ON, run automation continuously
+  useEffect(() => {
+    if (!upgraderActive) return
+    let alive = true
+    const loop = async () => {
+      while (alive) {
+        await executeUpgraderPlay()
+        await new Promise(r => setTimeout(r, 2500))
+      }
+    }
+    loop()
+    return () => { alive = false }
+  }, [upgraderActive])
+
+  useEffect(() => {
+    if (!battleActive) return
+    let alive = true
+    const loop = async () => {
+      while (alive) {
+        await executeBattleCreate()
+        await new Promise(r => setTimeout(r, 3000))
+      }
+    }
+    loop()
+    return () => { alive = false }
+  }, [battleActive])
+
+  useEffect(() => {
+    if (!minesActive) return
+    let alive = true
+    const loop = async () => {
+      while (alive) {
+        await executeMinesPlay()
+        await new Promise(r => setTimeout(r, 3000))
+      }
+    }
+    loop()
+    return () => { alive = false }
+  }, [minesActive])
 
   const formatValue = (microTokens) => {
     const bux = microTokens ? microTokens / 1000000 : 0

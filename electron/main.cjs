@@ -194,6 +194,44 @@ app.whenReady().then(() => {
     })
   })
 
+
+  // Proxy call to Rollbux Vercel backend (rollbux-one.vercel.app)
+  ipcMain.handle('backend-call', async (_event, { endpoint, method = 'POST', body = null }) => {
+    return new Promise((resolve) => {
+      const payload = body ? JSON.stringify(body) : null
+      const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Origin': 'https://rollbux.com',
+        'Referer': 'https://rollbux.com/',
+      }
+      if (payload) headers['Content-Length'] = Buffer.byteLength(payload)
+
+      const options = {
+        hostname: 'rollbux-one.vercel.app',
+        port: 443,
+        path: endpoint.startsWith('/') ? endpoint : `/${endpoint}`,
+        method: method.toUpperCase(),
+        headers
+      }
+
+      const req = https.request(options, (res) => {
+        let raw = ''
+        res.on('data', (chunk) => { raw += chunk })
+        res.on('end', () => {
+          let data = null
+          try { data = JSON.parse(raw) } catch (e) {}
+          resolve({ statusCode: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, data, text: raw })
+        })
+      })
+      req.on('error', (e) => resolve({ statusCode: 500, ok: false, error: e.message }))
+      req.setTimeout(20000, () => { req.destroy(); resolve({ statusCode: 408, ok: false, error: 'Timeout' }) })
+      if (payload) req.write(payload)
+      req.end()
+    })
+  })
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
