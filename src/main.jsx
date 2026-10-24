@@ -328,18 +328,22 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Live level polling — scrape /profile every 60 seconds
-  const [liveLevel, setLiveLevel] = useState(user.level)
+  // Live level polling — scrape /profile actively every 10 seconds
+  const [liveLevel, setLiveLevel] = useState(user.level || 1)
+  const [levelBadge, setLevelBadge] = useState(user.level || 1)
   useEffect(() => {
     const token = window.localStorage.getItem('sotarium_session_token') || ''
     const doFetch = async () => {
       if (window.electronAPI?.fetchLevel) {
         const res = await window.electronAPI.fetchLevel(token)
-        if (res.ok && res.level !== null) setLiveLevel(res.level)
+        if (res.ok && res.level !== null) {
+          setLiveLevel(res.level)
+          if (res.badge) setLevelBadge(res.badge)
+        }
       }
     }
     doFetch()
-    const interval = setInterval(doFetch, 60000)
+    const interval = setInterval(doFetch, 10000)
     return () => clearInterval(interval)
   }, [])
 
@@ -636,9 +640,26 @@ function RollbuxDashboard({ user, onLogout }) {
             <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
-              <span style={{ fontSize: 10, color: '#9aa3a8' }}>Lvl {liveLevel}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  background: 'linear-gradient(180deg, #2b3240 0%, #1e232d 100%)',
+                  border: '1px solid rgba(172, 255, 70, 0.4)',
+                  color: '#acff46',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  letterSpacing: '0.2px'
+                }}>
+                  LVL {liveLevel}
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -159,44 +159,51 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
-  // Fetch live player level from /_api/users/me (reliable, no HTML scraping)
+  // Fetch live player level: check /profile HTML first for the exact level badge, fallback to /_api/users/me
   ipcMain.handle('fetch-level', async (_event, token) => {
     return new Promise((resolve) => {
       const trimmed = (token || '').trim()
       const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Cookie': `authjs.session-token=${trimmed}`,
-        'Authorization': `Bearer ${trimmed}`,
         'Origin': 'https://rollbux.com',
         'Referer': 'https://rollbux.com/',
       }
-      const options = {
+
+      const req = https.request({
         hostname: 'rollbux.com',
         port: 443,
-        path: '/_api/users/me',
+        path: '/profile',
         method: 'GET',
         headers
-      }
-      const req = https.request(options, (res) => {
-        let raw = ''
-        res.on('data', (chunk) => { raw += chunk })
+      }, (res) => {
+        let html = ''
+        res.on('data', (chunk) => { html += chunk })
         res.on('end', () => {
-          try {
-            const data = JSON.parse(raw)
-            const user = data?.data?.user || data?.data || data?.user || data
-            // level field first, then xp_level, then tier
-            const level = user?.level ?? user?.xp_level ?? user?.tier ?? null
-            if (level !== null && level !== undefined) {
-              resolve({ ok: true, level: parseInt(level, 10) })
-            } else {
-              resolve({ ok: false, level: null })
-            }
-          } catch (e) {
-            resolve({ ok: false, level: null })
+          // Look for: <span class="relative z-10 text-shadow-lg mt-px">38</span> or level-badge
+          const badgeMatch = html.match(/--level-badge-(\d+)/)
+          const spanMatch = html.match(/class="[^"]*text-shadow-lg[^"]*"[^>]*>\s*(\d+)\s*<\/span>/)
+          const levelNum = spanMatch ? parseInt(spanMatch[1], 10) : (badgeMatch ? parseInt(badgeMatch[1], 10) : null)
+
+          if (levelNum !== null && !isNaN(levelNum)) {
+            return resolve({ ok: true, level: levelNum, badge: badgeMatch ? badgeMatch[1] : levelNum })
           }
+
+          // Fallback to /_api/users/me API
+          makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
+            if (apiRes.ok && apiRes.data) {
+              const u = apiRes.data.data?.user || apiRes.data.data || apiRes.data.user || apiRes.data
+              const lvl = u?.level ?? u?.xp_level ?? u?.tier ?? null
+              if (lvl !== null && lvl !== undefined) {
+                return resolve({ ok: true, level: parseInt(lvl, 10), badge: lvl })
+              }
+            }
+            resolve({ ok: false, level: null })
+          }).catch(() => resolve({ ok: false, level: null }))
         })
       })
+
       req.on('error', () => resolve({ ok: false, level: null }))
       req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, level: null }) })
       req.end()
@@ -218,7 +225,7 @@ app.whenReady().then(() => {
       if (payload) headers['Content-Length'] = Buffer.byteLength(payload)
 
       const options = {
-        hostname: 'rollbux-one.vercel.app',
+        hostname: 'rollbux.vercel.app',
         port: 443,
         path: endpoint.startsWith('/') ? endpoint : `/${endpoint}`,
         method: method.toUpperCase(),
