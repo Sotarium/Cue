@@ -542,18 +542,20 @@ body {
    ========================================================================== */
 .toast-notice {
   position: fixed;
-  top: 24px;
+  top: 36px;
   left: 50%;
   transform: translateX(-50%);
-  background: #1c2333;
-  color: #ffffff;
-  border: 1px solid rgba(172, 255, 70, 0.3);
-  padding: 10px 20px;
+  background: #121418;
+  color: #acff46;
+  border: 1.5px solid #acff46;
+  padding: 12px 24px;
   border-radius: 9999px;
   font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(172, 255, 70, 0.2);
-  z-index: 9999;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(172, 255, 70, 0.3);
+  z-index: 999999;
+  pointer-events: none;
   animation: fadeInDown 0.25s ease forwards;
 }
 
@@ -590,6 +592,14 @@ body {
   max-width: 260px;
 }
 
+
+.sotarium-brand-icon-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
 .cue-brand-header {
   display: flex;
   align-items: center;

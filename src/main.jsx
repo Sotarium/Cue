@@ -149,15 +149,15 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
       {toast && <div className="toast-notice">{toast}</div>}
 
       <div className="cue-auth-box">
-        <div className="cue-brand-header">
+        <div className="cue-brand-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
           <img
-            src="/cue-logo-transparent.png"
-            alt="cue"
-            className="cue-logo-img"
-            onError={(e) => {
-              e.target.style.display = 'none'
-            }}
+            src="/sotarium-brand-icon.png"
+            alt="Sotarium Icon"
+            className="sotarium-brand-icon-img"
           />
+          <span style={{ fontSize: '24px', fontWeight: 800, fontStyle: 'italic', letterSpacing: '0.5px', color: '#ffffff' }}>
+            Sotarium<span style={{ color: '#acff46' }}>.</span>
+          </span>
         </div>
 
         <h1 className="cue-auth-title">{mode === 'signup' ? 'Sign up' : 'Log in'}</h1>
