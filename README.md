@@ -6,6 +6,8 @@ This is a responsive React/Vite rebuild of the Cue-style Windows productivity ex
 
 The root route is the clean Sotarium download homepage. Its primary button downloads `Sotarium.exe` from the latest GitHub release, and the secondary link opens the Microsoft Store listing. `/app` opens the browser workspace. The packaged Windows executable opens the workspace directly, like a standalone desktop app.
 
+The first-run screen is a Rollbux-inspired Sotarium sign-up/login flow. It stores a local demo account in browser storage and does not read, store, or scrape Rollbux session cookies or private Rain Rewards transactions. A real connection would require an official Rollbux API or OAuth integration.
+
 ## Run locally
 
 ```bash

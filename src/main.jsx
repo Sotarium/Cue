@@ -218,6 +218,38 @@ function DownloadPage() {
   return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://github.com/Sotarium/Cue/releases/latest/download/Sotarium.exe">Download for Windows</a><a className="store-link" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Microsoft Store</a></div></main>
 }
 
+function AuthPage({ onComplete }) {
+  const [mode, setMode] = useState('signup')
+  const [identifierMode, setIdentifierMode] = useState('username')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const isSignup = mode === 'signup'
+  const submit = (event) => {
+    event.preventDefault()
+    setError('')
+    const cleanIdentifier = identifier.trim()
+    if (identifierMode === 'username' && !/^[a-zA-Z0-9_]{5,24}$/.test(cleanIdentifier)) return setError('Use 5–24 letters, numbers, or underscores.')
+    if (identifierMode === 'email' && !/^\S+@\S+\.\S+$/.test(cleanIdentifier)) return setError('Enter a valid email address.')
+    if (password.length < 5) return setError('Password must be at least 5 characters.')
+    setBusy(true)
+    window.setTimeout(() => {
+      const saved = JSON.parse(window.localStorage.getItem('sotarium_account') || 'null')
+      if (!isSignup && (!saved || saved.identifier.toLowerCase() !== cleanIdentifier.toLowerCase() || saved.password !== password)) {
+        setBusy(false)
+        return setError('That login did not work. Create an account first or check your details.')
+      }
+      window.localStorage.setItem('sotarium_account', JSON.stringify({ identifier: cleanIdentifier, mode: identifierMode, password }))
+      window.localStorage.setItem('sotarium_session', 'active')
+      setBusy(false)
+      onComplete()
+    }, 260)
+  }
+  const setIdentifierKind = (next) => { setIdentifierMode(next); setIdentifier(''); setError('') }
+  return <main className="auth-page"><section className="auth-card"><header className="auth-header"><div className="auth-logo-stack"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>{isSignup ? 'Sign up' : 'Log in'}</h1></header><form className="auth-form" onSubmit={submit}><div className="auth-field"><div className="auth-label-row"><label htmlFor="auth-identifier">{identifierMode === 'email' ? 'Email' : 'Username'}</label><div className="auth-mode-toggle"><button type="button" className={identifierMode === 'username' ? 'selected' : ''} onClick={() => setIdentifierKind('username')}>Username</button><button type="button" className={identifierMode === 'email' ? 'selected' : ''} onClick={() => setIdentifierKind('email')}>Email</button></div></div><input id="auth-identifier" value={identifier} onChange={event => setIdentifier(event.target.value)} type={identifierMode === 'email' ? 'email' : 'text'} autoComplete={identifierMode === 'email' ? 'email' : 'username'} placeholder={identifierMode === 'email' ? 'you@example.com' : 'Choose a username'} /></div><label className="auth-field"><span>Password <small>(5+ characters)</small></span><input value={password} onChange={event => setPassword(event.target.value)} type="password" autoComplete={isSignup ? 'new-password' : 'current-password'} /></label>{error && <p className="auth-error">{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}</button></form><p className="auth-switch">{isSignup ? 'Already have an account?' : 'Need an account?'} <button type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setError('') }}>{isSignup ? 'Log in' : 'Sign up'}</button></p></section></main>
+}
+
 const conversationSeeds = [
   { id: 'resume', name: 'Resume Update', preview: 'Here’s a revised introduction that...', time: '19:53', tone: 'blue', agent: 'Atlas' },
   { id: 'work', name: 'Work Assistant', preview: 'Your calendar is clear at 11:30 A...', time: '19:53', tone: 'brown', agent: 'Work Assistant' },
@@ -280,6 +312,7 @@ function App() {
   const createAgent = (newAgent) => { const agent = { ...newAgent, id: `${Date.now()}`, short: newAgent.name.split(' ')[0], description: `A focused ${newAgent.type.toLowerCase()} teammate, tuned for the way your team works.`, runs: '0', lastUsed: 'Not yet used', updated: 'Just now', status: 'Draft', tone: ['violet', 'mint', 'amber', 'blue'][agents.length % 4], avatar: newAgent.name.slice(0, 1).toUpperCase(), favorite: false, activity: ['Agent created and ready to shape'] }; setAgents(current => [agent, ...current]); setShowCreate(false); setSelectedAgent(agent); notify(`${agent.name} created`) }
   const isDesktopApp = window.location.protocol === 'file:' || window.location.pathname === '/app'
   if (!isDesktopApp) return <DownloadPage />
+  if (!window.localStorage.getItem('sotarium_session')) return <AuthPage onComplete={() => window.location.reload()} />
   return <SotariumWorkspace />
 }
 
