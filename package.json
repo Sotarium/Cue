@@ -2,11 +2,15 @@
   "name": "sotarium-agent",
   "private": true,
   "version": "1.0.0",
+  "description": "Sotarium personal agent workspace for Windows",
+  "author": "Sotarium",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "desktop:build": "npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -14,5 +18,20 @@
     "react": "latest",
     "react-dom": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "com.sotarium.app",
+    "productName": "Sotarium",
+    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "directories": { "output": "release" },
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }]
+    },
+    "portable": {
+      "artifactName": "Sotarium.exe"
+    }
+  }
 }

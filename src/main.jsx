@@ -215,7 +215,7 @@ function CreateModal({ onClose, onCreate }) {
 }
 
 function DownloadPage() {
-  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Download</a></div></main>
+  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://github.com/Sotarium/Cue/releases/latest/download/Sotarium.exe">Download for Windows</a><a className="store-link" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Microsoft Store</a></div></main>
 }
 
 const conversationSeeds = [
@@ -278,7 +278,8 @@ function App() {
   const toggleFavorite = (id) => setAgents(current => current.map(agent => agent.id === id ? { ...agent, favorite: !agent.favorite } : agent))
   const saveAgent = (updated) => { setAgents(current => current.map(agent => agent.id === updated.id ? updated : agent)); setSelectedAgent(updated) }
   const createAgent = (newAgent) => { const agent = { ...newAgent, id: `${Date.now()}`, short: newAgent.name.split(' ')[0], description: `A focused ${newAgent.type.toLowerCase()} teammate, tuned for the way your team works.`, runs: '0', lastUsed: 'Not yet used', updated: 'Just now', status: 'Draft', tone: ['violet', 'mint', 'amber', 'blue'][agents.length % 4], avatar: newAgent.name.slice(0, 1).toUpperCase(), favorite: false, activity: ['Agent created and ready to shape'] }; setAgents(current => [agent, ...current]); setShowCreate(false); setSelectedAgent(agent); notify(`${agent.name} created`) }
-  if (window.location.pathname === '/download') return <DownloadPage />
+  const isDesktopApp = window.location.protocol === 'file:' || window.location.pathname === '/app'
+  if (!isDesktopApp) return <DownloadPage />
   return <SotariumWorkspace />
 }
 

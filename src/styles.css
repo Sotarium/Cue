@@ -288,6 +288,8 @@ h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 44px); line-height: 1.04; l
 .download-card h1 { margin: 0 0 27px; font-size: 23px; line-height: 1.2; letter-spacing: -.04em; font-weight: 600; }
 .download-button { width: 100%; display: flex; align-items: center; justify-content: center; min-height: 42px; border-radius: 22px; background: #191919; color: #f5f5f5; font-size: 12px; font-weight: 600; text-decoration: none; transition: background .18s ease, transform .18s ease; }
 .download-button:hover { background: #111; transform: translateY(-1px); }
+.store-link { margin-top: 15px; color: #8ebcf2; font-size: 11px; text-decoration: none; }
+.store-link:hover { color: #c4ddff; }
 .workspace-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 15px; color: #8ebcf2; font-size: 11px; text-decoration: none; }
 .workspace-link:hover { color: #c4ddff; }
 

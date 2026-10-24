@@ -1,1 +1,1 @@
-{"routes":[{"path":"/","title":"Sotarium workspace"},{"path":"/download","title":"Download Sotarium"},{"path":"/agents","title":"Sotarium workspace"},{"path":"/settings","title":"Settings"}]}
+{"routes":[{"path":"/","title":"Download Sotarium"},{"path":"/app","title":"Sotarium workspace"},{"path":"/download","title":"Download Sotarium"}]}

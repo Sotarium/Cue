@@ -4,7 +4,7 @@ This is a responsive React/Vite rebuild of the Cue-style Windows productivity ex
 
 ## Included
 
-The root route opens the chat workspace. `/download` opens a clean Sotarium download page whose button links to the Microsoft Store listing supplied for the reference app.
+The root route is the clean Sotarium download homepage. Its primary button downloads `Sotarium.exe` from the latest GitHub release, and the secondary link opens the Microsoft Store listing. `/app` opens the browser workspace. The packaged Windows executable opens the workspace directly, like a standalone desktop app.
 
 ## Run locally
 
@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-The dev server listens on port 5173. The production build is verified with `npm run build`.
+The dev server listens on port 5173. The production build is verified with `npm run build`. To package the Windows app, run `npm run desktop:build`; the portable executable is written to `release/Sotarium.exe`.
 
 ## Notes
 
