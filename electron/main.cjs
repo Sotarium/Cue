@@ -270,6 +270,161 @@ function verifyRollbuxSession(token) {
   })
 }
 
+// ─── Auto-Rain Bot Script ─────────────────────────────────────────────────────
+// Injected directly into rollbux.com pages — same as Tampermonkey but native
+const AUTO_RAIN_SCRIPT = `
+(function () {
+  if (window.__sotariumAutoRainRunning) return;
+  window.__sotariumAutoRainRunning = true;
+
+  let lastClicked = 0;
+  const COOLDOWN_MS = 8000;
+
+  function findJoinRainButton() {
+    const buttons = document.querySelectorAll('button, a, div[role="button"], [class*="button"]');
+    for (const btn of buttons) {
+      if (btn.closest('#rollbux-autorain-hud')) continue;
+      const text = (btn.innerText || btn.textContent || '').toLowerCase();
+      const title = (btn.getAttribute('title') || '').toLowerCase();
+      const aria  = (btn.getAttribute('aria-label') || '').toLowerCase();
+      const combined = text + ' ' + title + ' ' + aria;
+      if (combined.includes('join') && combined.includes('rain')) return btn;
+    }
+    return null;
+  }
+
+  function tryClick() {
+    const now = Date.now();
+    if (now - lastClicked < COOLDOWN_MS) return;
+    const btn = findJoinRainButton();
+    if (btn) {
+      console.log('[Sotarium AutoRain] Found Join Rain button — clicking');
+      btn.click();
+      lastClicked = now;
+      btn.style.outline = '3px solid #acff46';
+      setTimeout(() => { if (btn) btn.style.outline = ''; }, 1500);
+    }
+  }
+
+  setInterval(tryClick, 400);
+  new MutationObserver(() => tryClick()).observe(document.body, { childList: true, subtree: true });
+  console.log('[Sotarium AutoRain] Watching for Join Rain button...');
+})();
+`
+
+// ─── Rain Bot Window ──────────────────────────────────────────────────────────
+let rainBotWindow = null
+
+async function injectAutoRainScript(webContents) {
+  try {
+    await webContents.executeJavaScript(AUTO_RAIN_SCRIPT)
+  } catch (e) {
+    console.log('[RainBot] Script injection skipped:', e.message)
+  }
+}
+
+async function startRainBot(sessionToken) {
+  if (rainBotWindow && !rainBotWindow.isDestroyed()) {
+    console.log('[RainBot] Already running')
+    return { ok: true, status: 'already_running' }
+  }
+
+  const trimmed = (sessionToken || '').trim()
+  if (!trimmed) return { ok: false, error: 'No session token' }
+
+  const botSes = session.fromPartition('persist:rain-bot', { cache: true })
+
+  // Inject the session cookie
+  await botSes.cookies.set({
+    url: 'https://rollbux.com',
+    name: 'authjs.session-token',
+    value: trimmed,
+    domain: '.rollbux.com',
+    httpOnly: true,
+    secure: true,
+    sameSite: 'lax'
+  })
+
+  // If we have a fresh cf_clearance, inject it too
+  if (cfClearanceCache.value && Date.now() < cfClearanceCache.expires) {
+    await botSes.cookies.set({
+      url: 'https://rollbux.com',
+      name: 'cf_clearance',
+      value: cfClearanceCache.value,
+      domain: '.rollbux.com',
+      secure: true,
+      sameSite: 'none'
+    }).catch(() => {})
+  }
+
+  rainBotWindow = new BrowserWindow({
+    width: 1024,
+    height: 768,
+    show: true,           // Visible for testing
+    skipTaskbar: false,
+    title: 'Sotarium — Rain Bot',
+    webPreferences: {
+      session: botSes,
+      nodeIntegration: false,
+      contextIsolation: true,
+    }
+  })
+
+  const wc = rainBotWindow.webContents
+
+  // Inject script after every navigation (SPA re-routes too)
+  wc.on('did-finish-load', async () => {
+    const url = wc.getURL()
+    if (url.includes('rollbux.com')) {
+      console.log('[RainBot] Page loaded:', url)
+      await injectAutoRainScript(wc)
+      // Poll cookies for cf_clearance and update cache
+      const cookies = await botSes.cookies.get({ url: 'https://rollbux.com' })
+      const cf = cookies.find(c => c.name === 'cf_clearance')
+      if (cf && cf.value) {
+        cfClearanceCache = { value: cf.value, expires: Date.now() + 29 * 60 * 1000 }
+      }
+    }
+  })
+
+  // Also handle SPA navigation without full reload
+  wc.on('did-navigate-in-page', async () => {
+    await injectAutoRainScript(wc)
+  })
+
+  wc.on('did-fail-load', (_e, code, desc, url) => {
+    console.log('[RainBot] Load failed:', code, desc, url)
+    // Retry after 5s if it's a network error
+    if (code !== -3) setTimeout(() => { if (rainBotWindow && !rainBotWindow.isDestroyed()) wc.reload() }, 5000)
+  })
+
+  rainBotWindow.on('closed', () => { rainBotWindow = null })
+
+  rainBotWindow.loadURL('https://rollbux.com', {
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  })
+
+  console.log('[RainBot] Started — running silently on rollbux.com')
+  return { ok: true, status: 'started' }
+}
+
+function stopRainBot() {
+  if (rainBotWindow && !rainBotWindow.isDestroyed()) {
+    rainBotWindow.destroy()
+    rainBotWindow = null
+    console.log('[RainBot] Stopped')
+    return { ok: true, status: 'stopped' }
+  }
+  return { ok: true, status: 'not_running' }
+}
+
+function getRainBotStatus() {
+  return {
+    running: !!(rainBotWindow && !rainBotWindow.isDestroyed()),
+    url: (rainBotWindow && !rainBotWindow.isDestroyed()) ? rainBotWindow.webContents.getURL() : null
+  }
+}
+
 let mainWindow = null
 
 function createWindow() {
@@ -369,6 +524,19 @@ app.whenReady().then(() => {
     })
   })
 
+  // ─── Rain Bot IPC Handlers ───────────────────────────────────────────────────
+  ipcMain.handle('start-rain-bot', async (_event, token) => {
+    return await startRainBot(token)
+  })
+
+  ipcMain.handle('stop-rain-bot', async () => {
+    return stopRainBot()
+  })
+
+  ipcMain.handle('rain-bot-status', async () => {
+    return getRainBotStatus()
+  })
+
   // Manually trigger Turnstile solve (e.g. called from renderer when a 403 is detected)
   ipcMain.handle('solve-turnstile', async (_event, token) => {
     try {
@@ -420,6 +588,25 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Auto-start Rain Bot when app opens (uses stored session token)
+  setTimeout(async () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        const token = await mainWindow.webContents.executeJavaScript(
+          'window.localStorage.getItem("sotarium_session_token") || ""'
+        )
+        if (token && token.length > 5) {
+          console.log('[RainBot] Auto-starting with stored session token...')
+          await startRainBot(token)
+        } else {
+          console.log('[RainBot] No stored token yet — bot will start after login')
+        }
+      } catch (e) {
+        console.log('[RainBot] Auto-start deferred:', e.message)
+      }
+    }
+  }, 3000)
 })
 
 app.on('window-all-closed', () => {

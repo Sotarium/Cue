@@ -410,6 +410,32 @@ function RollbuxDashboard({ user, onLogout }) {
   const [minesActive, setMinesActive] = useState(false)
   const [minesFeedback, setMinesFeedback] = useState('Ready')
 
+  // Rain Bot state (auto-clicks Join Rain button in hidden browser window)
+  const [rainBotActive, setRainBotActive] = useState(false)
+  const [rainBotFeedback, setRainBotFeedback] = useState('Inactive')
+
+  const toggleRainBot = async () => {
+    if (!rainBotActive) {
+      setRainBotFeedback('Starting...')
+      const token = window.localStorage.getItem('sotarium_session_token') || ''
+      if (window.electronAPI?.startRainBot) {
+        const res = await window.electronAPI.startRainBot(token)
+        if (res?.ok) {
+          setRainBotActive(true)
+          setRainBotFeedback('Running')
+        } else {
+          setRainBotFeedback('Failed: ' + (res?.error || 'unknown'))
+        }
+      }
+    } else {
+      if (window.electronAPI?.stopRainBot) {
+        await window.electronAPI.stopRainBot()
+      }
+      setRainBotActive(false)
+      setRainBotFeedback('Inactive')
+    }
+  }
+
   // Data state
   const [rains, setRains] = useState([])
   const [gameHistory, setGameHistory] = useState([])
@@ -1196,9 +1222,17 @@ function RollbuxDashboard({ user, onLogout }) {
         {sideTab === 'rains' && (
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
             <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
-              <div className="flex shrink-0 flex-col items-start gap-[6px]">
-
+              <div className="flex w-full items-center justify-between shrink-0">
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
+                <button
+                  onClick={toggleRainBot}
+                  type="button"
+                  className={` lex items-center gap-[8px] h-[36px] rounded-[9px] px-[16px] font-bold text-[13px] transition cursor-pointer border ${rainBotActive ? 'bg-[#acff46] text-[#121418] border-[#acff46]' : 'bg-transparent text-[#9aa3a8] border-white/10 hover:border-[#acff46]/40 hover:text-white'} `}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+                  {rainBotActive ? 'Bot Running' : 'Start Rain Bot'}
+                  {rainBotActive && <span className="ml-1 h-2 w-2 rounded-full bg-[#121418] animate-pulse inline-block" />}
+                </button>
               </div>
               {/* Live rain cycle banner */}
               {rainCycle && (
