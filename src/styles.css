@@ -480,3 +480,25 @@ h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 44px); line-height: 1.04; l
 .auth-switch button:hover { text-decoration: underline; }
 
 .auth-switch-link { width: 100%; cursor: pointer; }
+
+/* Exact minimal session-gate treatment from the supplied target reference */
+.auth-page { background: #242424; }
+.auth-card { width: 300px; }
+.auth-header { margin-bottom: 36px; }
+.auth-logo-inline { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.auth-logo-inline strong { color: #f7f7f7; font-size: 34px; line-height: 1; letter-spacing: -.07em; }
+.auth-reference-mark { position: relative; width: 52px; height: 52px; display: block; flex: 0 0 auto; clip-path: polygon(50% 0%, 68% 8%, 84% 4%, 94% 20%, 100% 39%, 92% 54%, 96% 74%, 78% 84%, 67% 98%, 48% 91%, 31% 100%, 20% 84%, 3% 77%, 9% 58%, 0% 41%, 13% 26%, 16% 8%, 35% 11%); background: #4aa5ef; box-shadow: 0 5px 13px rgba(74,165,239,.18); }
+.auth-reference-mark i { position: absolute; left: 15px; top: 16px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.auth-reference-mark i::after { content: ''; position: absolute; left: 7px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: #22324b; }
+.auth-reference-mark b { position: absolute; right: 9px; top: 20px; width: 16px; height: 4px; border-radius: 5px; background: #22324b; transform: rotate(-31deg); }
+.auth-header h1 { margin-top: 32px; font-size: 21px; font-weight: 600; }
+.auth-form { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.session-input { width: 100%; height: 35px; padding: 0 12px; border: 0 !important; border-radius: 18px !important; outline: 0; color: #c6c6c6; background: #191919 !important; font-size: 11px !important; box-shadow: none !important; }
+.session-input::placeholder { color: #676767; }
+.session-input:focus { background: #171717 !important; }
+.auth-error { margin: 10px 0 0; color: #ef8585; text-align: center; font-size: 10px; }
+.auth-submit { width: 100%; height: 35px; margin-top: 8px; border-radius: 18px; color: #777; background: #191919; font-size: 11px; font-weight: 500; transition: color .18s ease, background .18s ease; }
+.auth-submit:hover:not(:disabled) { color: #bdbdbd; background: #151515; transform: none; }
+.auth-switch { margin-top: 22px; color: #777; font-size: 10px; }
+.auth-switch-link { color: #777; }
+.auth-switch-link:hover { color: #a9a9a9; text-decoration: underline; }

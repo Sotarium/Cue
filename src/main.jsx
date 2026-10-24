@@ -220,38 +220,33 @@ function DownloadPage() {
 
 function AuthPage({ onComplete }) {
   const [mode, setMode] = useState('signup')
-  const [identifierMode, setIdentifierMode] = useState('username')
-  const [identifier, setIdentifier] = useState('')
-  const [password, setPassword] = useState('')
+  const [sessionText, setSessionText] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const isSignup = mode === 'signup'
   const submit = (event) => {
     event.preventDefault()
     setError('')
-    const cleanIdentifier = identifier.trim()
-    if (identifierMode === 'username' && !/^[a-zA-Z0-9_]{5,24}$/.test(cleanIdentifier)) return setError('Use 5–24 letters, numbers, or underscores.')
-    if (identifierMode === 'email' && !/^\S+@\S+\.\S+$/.test(cleanIdentifier)) return setError('Enter a valid email address.')
-    if (password.length < 5) return setError('Password must be at least 5 characters.')
+    if (!sessionText.trim()) return setError('Enter a local demo session to continue.')
     setBusy(true)
     window.setTimeout(() => {
       const saved = JSON.parse(window.localStorage.getItem('sotarium_account') || 'null')
-      if (isSignup && saved && saved.identifier.toLowerCase() === cleanIdentifier.toLowerCase()) {
+      if (isSignup && saved) {
         setBusy(false)
-        return setError('You already have an account. Please log in instead.')
+        return setError('You already have an account signed up. Please log in instead.')
       }
-      if (!isSignup && (!saved || saved.identifier.toLowerCase() !== cleanIdentifier.toLowerCase() || saved.password !== password)) {
+      if (!isSignup && !saved) {
         setBusy(false)
-        return setError('That login did not work. Create an account first or check your details.')
+        return setError('No local account found. Please sign up first.')
       }
-      window.localStorage.setItem('sotarium_account', JSON.stringify({ identifier: cleanIdentifier, mode: identifierMode, password }))
+      window.localStorage.setItem('sotarium_account', JSON.stringify({ identifier: 'local-demo', mode: 'demo' }))
       window.localStorage.setItem('sotarium_session', 'active')
+      setSessionText('')
       setBusy(false)
       onComplete()
     }, 260)
   }
-  const setIdentifierKind = (next) => { setIdentifierMode(next); setIdentifier(''); setError('') }
-  return <main className="auth-page"><section className="auth-card"><header className="auth-header"><div className="auth-logo-stack"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>{isSignup ? 'Sign up' : 'Log in'}</h1></header><form className="auth-form" onSubmit={submit}><div className="auth-field"><div className="auth-label-row"><label htmlFor="auth-identifier">{identifierMode === 'email' ? 'Email' : 'Username'}</label><div className="auth-mode-toggle"><button type="button" className={identifierMode === 'username' ? 'selected' : ''} onClick={() => setIdentifierKind('username')}>Username</button><button type="button" className={identifierMode === 'email' ? 'selected' : ''} onClick={() => setIdentifierKind('email')}>Email</button></div></div><input id="auth-identifier" value={identifier} onChange={event => setIdentifier(event.target.value)} type={identifierMode === 'email' ? 'email' : 'text'} autoComplete={identifierMode === 'email' ? 'email' : 'username'} placeholder={identifierMode === 'email' ? 'you@example.com' : 'Choose a username'} /></div><label className="auth-field"><span>Password <small>(5+ characters)</small></span><input value={password} onChange={event => setPassword(event.target.value)} type="password" autoComplete={isSignup ? 'new-password' : 'current-password'} /></label>{error && <p className="auth-error">{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : isSignup ? 'Sign up' : 'Log in'}</button></form><button className="auth-switch auth-switch-link" type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setIdentifier(''); setPassword(''); setError('') }}>{isSignup ? 'Already have an account? Log in' : 'Need an account? Sign up'}</button></section></main>
+  return <main className="auth-page"><section className="auth-card"><header className="auth-header"><div className="auth-logo-inline"><span className="auth-reference-mark"><i></i><b></b></span><strong>Sotarium</strong></div><h1>{isSignup ? 'Sign up' : 'Log in'}</h1></header><form className="auth-form" onSubmit={submit}><input className="session-input" value={sessionText} onChange={event => setSessionText(event.target.value)} type="text" autoComplete="off" placeholder="Enter demo session" aria-label="Enter demo session" />{error && <p className="auth-error">{error}</p>}<button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Please wait…' : 'Continue'}</button></form><button className="auth-switch auth-switch-link" type="button" onClick={() => { setMode(isSignup ? 'login' : 'signup'); setSessionText(''); setError('') }}>{isSignup ? 'Already have an account? Log in' : 'Need an account? Sign up'}</button></section></main>
 }
 
 const conversationSeeds = [
