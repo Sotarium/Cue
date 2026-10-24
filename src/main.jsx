@@ -517,25 +517,6 @@ function RollbuxDashboard({ user, onLogout }) {
                 {/* Left sidebar */}
                 <div className="flex w-full shrink-0 flex-col items-start gap-[16px] lg:w-[300px] xl:w-[320px]">
 
-                  {/* Referral card */}
-                  <div className="relative flex w-full flex-col items-start gap-[16px] overflow-clip rounded-[12px] bg-[#0e131f] p-[24px] shadow-sm border border-white/[0.03]">
-                    <p className="whitespace-nowrap text-[16px] font-bold leading-[24px] text-white">Your Referral code</p>
-                    <div className="flex w-full flex-col gap-[10px]">
-                      <div className="relative flex w-full items-center justify-between overflow-clip rounded-[7px] px-[12px] py-[10px] bg-[#131a29]">
-                        <span className="font-mono text-[14px] font-bold leading-[20px] tracking-[1px] text-[#acff46]">{user.username}</span>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => showToast('Edit referral code')} type="button" className="text-[11px] font-semibold text-[#9aa3a8] hover:text-[#acff46] transition cursor-pointer">Edit</button>
-                          <button onClick={handleCopyCode} type="button" className="text-[12px] font-semibold text-[#9aa3a8] hover:text-white transition cursor-pointer">{copiedCode ? 'Copied!' : 'Copy'}</button>
-                        </div>
-                      </div>
-                      <button onClick={handleCopyLink} type="button" className="group relative flex w-full items-center justify-between gap-[8px] overflow-clip rounded-[7px] px-[12px] py-[10px] text-left bg-[#131a29] hover:brightness-110 active:scale-[0.99] transition cursor-pointer">
-                        <span className="relative min-w-0 truncate text-[14px] font-medium text-[#9aa3a8]">https://rollbux.com/r/{user.username.toLowerCase()}</span>
-                        <span className="relative size-[20px] shrink-0">
-                          <img alt="Copy" className="absolute inset-0 block size-full opacity-80 group-hover:opacity-100" src="/figma/af-copy.svg" />
-                        </span>
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Currency switcher */}
                   <div className="w-full flex items-center justify-between bg-[#0e131f] p-3 rounded-[12px] border border-white/[0.03] text-[12px]">
@@ -547,46 +528,6 @@ function RollbuxDashboard({ user, onLogout }) {
                           {unit}
                         </button>
                       ))}
-                    </div>
-                  </div>
-
-                  {/* Accounts Infos */}
-                  <div className="relative flex w-full flex-col items-start gap-[12px] overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] shadow-sm border border-white/[0.03]">
-                    <div className="flex w-full items-center justify-between">
-                      <span className="text-[14px] font-bold text-white">Accounts Infos</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-gray-400">Auto Messages</span>
-                        <label className="relative inline-flex items-center cursor-pointer select-none">
-                          <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
-                        </label>
-                      </div>
-                    </div>
-                    <div className="flex w-full flex-col gap-2 pt-1 border-t border-white/[0.04]">
-                      <div className="flex items-center justify-between py-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[12px] font-bold text-[#acff46]">{user.username} :</span>
-                          <span className="text-[13px] font-black text-[#acff46]">3 / 3</span>
-                        </div>
-                        <span className="text-[10px] font-mono text-gray-500">Active</span>
-                      </div>
-                    </div>
-                    <div className="flex w-full flex-col items-center justify-center py-2 border-t border-white/[0.04] gap-1">
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Next Message In</span>
-                      <div className="relative flex items-center justify-center size-[96px] mt-1">
-                        <svg className="size-full -rotate-90" viewBox="0 0 36 36">
-                          <path className="text-white/5" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                          <path className="text-[#acff46] transition-all duration-1000 ease-linear" strokeWidth="3" strokeDasharray="80, 100" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                        </svg>
-                        <div className="absolute flex flex-col items-center justify-center text-center">
-                          <span className="text-[15px] font-mono font-bold text-white">08:42</span>
-                          <span className="text-[9px] text-[#acff46] uppercase font-semibold">Active</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 pt-2 w-full border-t border-white/[0.04]">
-                      <button onClick={() => showToast('Account token is configured')} type="button" className="w-full py-2 bg-[#acff46] hover:bg-[#96e036] text-[#121418] rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer">Token</button>
-                      <button onClick={() => showToast('Accounts registered: 1')} className="w-full py-2 bg-gradient-to-r from-[#a855f7] to-[#8b5cf6] hover:brightness-110 text-white rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer">Accounts</button>
                     </div>
                   </div>
                 </div>
