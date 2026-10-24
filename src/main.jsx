@@ -283,6 +283,37 @@ function RollbuxDashboard({ user, onLogout }) {
   const [rainCycle, setRainCycle] = useState(null) // { secondsLeft, potBux }
   const [rainTxs, setRainTxs] = useState([])       // actual earned rain transactions
 
+  const deleteRainTx = async (txTimestamp, txIndex) => {
+    // Optimistic UI update
+    const targetTx = rainTxs[txIndex] || rainTxs.find(t => t.timestamp === txTimestamp)
+    setRainTxs(prev => prev.filter((t, idx) => {
+      if (txTimestamp && t.timestamp === txTimestamp) return false
+      if (idx === txIndex) return false
+      return true
+    }))
+    setRains(prev => prev.filter((_, idx) => idx !== txIndex))
+    showToast('Rain transaction removed')
+
+    try {
+      if (window.electronAPI?.backendCall) {
+        await window.electronAPI.backendCall({
+          endpoint: '/api/status',
+          method: 'POST',
+          body: {
+            action: 'delete_transaction',
+            username: user.username,
+            timestamp: txTimestamp || undefined,
+            index: txIndex !== undefined ? txIndex : undefined,
+            cycle_id: targetTx ? targetTx.cycle_id : undefined,
+            signature: targetTx ? `${targetTx.amount_bux}_${targetTx.time || ''}` : undefined
+          }
+        })
+      }
+    } catch (e) {
+      console.error('Failed to sync rain deletion:', e)
+    }
+  }
+
   const fetchRains = async () => {
     // 1. Live cycle — public endpoint
     try {
@@ -308,9 +339,9 @@ function RollbuxDashboard({ user, onLogout }) {
           body: null
         })
         if (res.ok && res.data?.user) {
+          if (res.data.solPrice) setSolPrice(res.data.solPrice)
           const txs = res.data.user.transactions || []
-          setRainTxs(txs.slice(0, 50)) // keep last 50
-          // update overview counts
+          setRainTxs(txs)
           setRains(txs.map((t, i) => ({
             id: t.cycle_id || i,
             amount: t.amount_bux || 0,
@@ -571,11 +602,19 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => { alive = false }
   }, [minesActive])
 
+  const [solPrice, setSolPrice] = useState(150.00)
+
+  // Universal format value based on currentUnit (BUX, USD, SOL)
+  const formatBuxValue = (buxVal) => {
+    const bux = parseFloat(buxVal) || 0
+    if (currentUnit === 'USD') return `$${(bux * 0.002).toFixed(2)}`
+    if (currentUnit === 'SOL') return `${((bux * 0.002) / (solPrice || 150)).toFixed(4)}`
+    return bux.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   const formatValue = (microTokens) => {
     const bux = microTokens ? microTokens / 1000000 : 0
-    if (currentUnit === 'USD') return `$${(bux * 0.01).toFixed(2)}`
-    if (currentUnit === 'SOL') return `${(bux * 0.0001).toFixed(4)}`
-    return bux.toFixed(2)
+    return formatBuxValue(bux)
   }
 
   // Side nav items
@@ -623,7 +662,7 @@ function RollbuxDashboard({ user, onLogout }) {
             }}
           >
             {id.charAt(0).toUpperCase() + id.slice(1)}
-            {sideTab === id && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'block' }} />}
+            {/* active tab indicator */}
           </button>
         ))}
 
@@ -667,6 +706,23 @@ function RollbuxDashboard({ user, onLogout }) {
 
       {/* ── Main content ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100vh' }}>
+        {/* Universal Top Bar with Global Currency Selector across all tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '16px 24px 0 24px', width: '100%' }}>
+          <div className="flex gap-1 bg-[#131a29] p-1 rounded-md border border-white/[0.04] shadow-sm">
+            {[
+              { id: 'BUX', icon: './figma/token-bux.png' },
+              { id: 'USD', icon: './figma/token-usd.svg' },
+              { id: 'SOL', icon: './figma/af-coin-24.svg' },
+            ].map(({ id, icon }) => (
+              <button key={id} onClick={() => setCurrentUnit(id)} type="button"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === id ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
+                <img src={icon} alt={id} style={{ width: 14, height: 14, objectFit: 'contain', flexShrink: 0 }} />
+                {id}
+              </button>
+            ))}
+          </div>
+        </div>
+
 
         {/* ════ HOME TAB ════ */}
         {sideTab === 'home' && (
@@ -684,26 +740,13 @@ function RollbuxDashboard({ user, onLogout }) {
                     <div className="flex w-full items-center justify-between gap-3">
                       <p className="text-[20px] font-bold italic text-white">Overview</p>
                       <div className="flex items-center gap-3">
-                        <div className="flex gap-1 bg-[#131a29] p-1 rounded-md border border-white/[0.04]">
-                          {[
-                            { id: 'BUX', icon: './figma/token-bux.png' },
-                            { id: 'USD', icon: './figma/token-usd.svg' },
-                            { id: 'SOL', icon: './figma/af-coin-24.svg' },
-                          ].map(({ id, icon }) => (
-                            <button key={id} onClick={() => setCurrentUnit(id)} type="button"
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === id ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
-                              <img src={icon} alt={id} style={{ width: 14, height: 14, objectFit: 'contain', flexShrink: 0 }} />
-                              {id}
-                            </button>
-                          ))}
-                        </div>
                         <button onClick={() => showToast('Overview metrics reset')} type="button" className="flex h-[32px] items-center justify-center rounded-[7px] px-[14px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] w-full">
                       <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
                         <p className="text-[14px] font-medium text-[#9aa3a8]">Rains Joined</p>
-                        <p className="text-[20px] font-bold text-white">0 Rains</p>
+                        <p className="text-[20px] font-bold text-white">{rainTxs.length} Rains</p>
                       </div>
                       <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
                         <p className="text-[14px] font-medium text-[#9aa3a8]">How Much Time</p>
@@ -713,7 +756,7 @@ function RollbuxDashboard({ user, onLogout }) {
                         <p className="text-[14px] font-medium text-[#9aa3a8]">Total Earnings</p>
                         <div className="flex items-center gap-[8px]">
                           <img alt="" className="size-[24px]" src="./figma/af-coin-24.svg" />
-                          <p className="text-[20px] font-bold text-white">0.00</p>
+                          <p className="text-[20px] font-bold text-white">{formatBuxValue(rainTxs.reduce((acc, t) => acc + (t.amount_bux || 0), 0))}</p>
                         </div>
                       </div>
                       <div className="relative flex w-full items-center justify-between gap-[12px] rounded-[12px] border border-[rgba(172,255,70,0.12)] px-[20px] py-[16px] bg-[#0e131f]">
@@ -747,17 +790,60 @@ function RollbuxDashboard({ user, onLogout }) {
                     <div className="relative flex w-full flex-col items-start justify-center overflow-clip rounded-[12px] p-[24px] border border-white/[0.03] bg-[#0e131f]">
                       <div className="custom-scroll relative h-[348px] w-full overflow-x-auto overflow-y-clip">
                         <div className="relative h-full w-full min-w-[500px]">
-                          <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] text-[12px] font-bold text-[#6d7680]">
-                            <p>100</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p className="text-white font-bold">0</p>
-                          </div>
-                          <div className="absolute cursor-crosshair" style={{ left: 56, top: 9, width: 'calc(100% - 56px)', height: 330 }}>
-                            <svg className="absolute inset-0 size-full" viewBox="0 0 744 330" preserveAspectRatio="none">
-                              <line x1="0" y1="20" x2="744" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                              <line x1="0" y1="130" x2="744" y2="130" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                              <line x1="0" y1="240" x2="744" y2="240" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                              <path d="M 0 330 L 744 330" fill="none" stroke="#7974FF" strokeWidth="2.5" />
-                            </svg>
-                          </div>
+                          {(() => {
+                            // Compute dynamic points from rain transactions
+                            const sortedTxs = [...rainTxs].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+                            let cumulative = 0
+                            const points = sortedTxs.map(t => {
+                              cumulative += (t.amount_bux || 0)
+                              return cumulative
+                            })
+
+                            const maxVal = Math.max(10, Math.ceil((Math.max(...points, 0) || 10) * 1.15))
+                            const width = 744
+                            const height = 330
+
+                            let pathD = 'M 0 330 L 744 330'
+                            let fillD = 'M 0 330 L 744 330 L 744 330 L 0 330 Z'
+
+                            if (points.length >= 2) {
+                              const coords = points.map((val, idx) => {
+                                const x = (idx / (points.length - 1)) * width
+                                const y = height - (val / maxVal) * (height - 45) - 15
+                                return `${x.toFixed(1)},${y.toFixed(1)}`
+                              })
+                              pathD = 'M ' + coords.join(' L ')
+                              fillD = `M 0,${height} L ` + coords.join(' L ') + ` L ${width},${height} Z`
+                            }
+
+                            return (
+                              <>
+                                <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] text-[12px] font-bold text-[#6d7680]">
+                                  <p>{formatBuxValue(maxVal)}</p>
+                                  <p>{formatBuxValue(maxVal * 0.75)}</p>
+                                  <p>{formatBuxValue(maxVal * 0.50)}</p>
+                                  <p>{formatBuxValue(maxVal * 0.25)}</p>
+                                  <p className="text-white font-bold">{formatBuxValue(0)}</p>
+                                </div>
+                                <div className="absolute cursor-crosshair" style={{ left: 68, top: 9, width: 'calc(100% - 68px)', height: 330 }}>
+                                  <svg className="absolute inset-0 size-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                                    <defs>
+                                      <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#7974FF" stopOpacity="0.25" />
+                                        <stop offset="100%" stopColor="#7974FF" stopOpacity="0.0" />
+                                      </linearGradient>
+                                    </defs>
+                                    <line x1="0" y1="20" x2={width} y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                    <line x1="0" y1="100" x2={width} y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                    <line x1="0" y1="180" x2={width} y2="180" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                    <line x1="0" y1="260" x2={width} y2="260" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                    <path d={fillD} fill="url(#chartGradient)" />
+                                    <path d={pathD} fill="none" stroke="#7974FF" strokeWidth="2.5" />
+                                  </svg>
+                                </div>
+                              </>
+                            )
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -789,7 +875,7 @@ function RollbuxDashboard({ user, onLogout }) {
                               <span className="text-center">
                                 <span className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase ${item.success ? 'bg-[#acff46]/10 text-[#acff46]' : 'bg-red-500/10 text-red-400'}`}>{item.success ? 'Success' : 'Loss'}</span>
                               </span>
-                              <span className="text-center text-[13px] font-bold text-[#c2c6db]">{item.amount} BUX</span>
+                              <span className="text-center text-[13px] font-bold text-[#c2c6db]">{formatBuxValue(item.amount)}</span>
                               <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{item.time}</span>
                             </div>
                           ))}
@@ -981,20 +1067,41 @@ function RollbuxDashboard({ user, onLogout }) {
                   </div>
                 </div>
                 <div className="custom-scroll w-full overflow-x-auto overflow-y-hidden">
-                  <div className="relative w-full min-w-[600px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
-                    <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
-                      <div>Account</div><div className="text-center">Amount</div><div className="text-right pr-2">Time</div>
+                  <div className="relative w-full min-w-[650px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
+                      <div>Account</div>
+                      <div className="text-center">Time Left</div>
+                      <div className="text-center">Amount</div>
+                      <div className="text-right pr-2">Time</div>
+                      <div className="text-center"></div>
                     </div>
                     <div className="flex flex-col divide-y divide-white/[0.02]">
                       {rainTxs.length === 0 ? (
                         <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
-                          <p className="text-[13px] text-[#9aa3a8]">No rain transactions yet. Syncing from backend every 15s...</p>
+                          <p className="text-[13px] text-[#9aa3a8]">No rain transactions yet. The rain bot will sync transactions automatically.</p>
                         </div>
                       ) : rainTxs.map((tx, i) => (
-                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02]">
-                          <span className="truncate text-[14px] font-bold italic text-[#acff46]">{tx.account || user.username}</span>
-                          <span className="text-center text-[14px] font-bold text-white">+{(tx.amount_bux || 0).toFixed(2)} BUX</span>
-                          <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02] group">
+                          <span className="truncate text-[14px] font-bold italic text-white">{tx.account || user.username}</span>
+                          <span className="text-center text-[13px] font-semibold" style={{ color: 'rgb(255, 107, 107)' }}>Completed</span>
+                          <span className="text-center text-[14px] font-bold italic text-[#c2c6db]">+{formatBuxValue(tx.amount_bux || 0)}</span>
+                          <span className="text-right pr-2">
+                            <span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">
+                              {tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </span>
+                          </span>
+                          <span className="flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => deleteRainTx(tx.timestamp, i)}
+                              className="flex items-center justify-center size-[26px] rounded-[6px] text-[#ff4b4b] hover:bg-[#ff4b4b]/20 hover:text-white transition active:scale-90 cursor-pointer"
+                              title="Delete this rain"
+                            >
+                              <svg className="size-4 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </span>
                         </div>
                       ))}
                     </div>
