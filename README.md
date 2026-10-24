@@ -1,10 +1,10 @@
 # Sotarium rebuild
 
-This is a responsive React/Vite rebuild of the signed-in Agents workspace implied by `https://manus.im/app/agents`. The public reference redirects to sign-in, so this implementation focuses on the visible app shell and the core agent-management experience rather than reproducing the authentication wall.
+This is a responsive React/Vite rebuild of the Cue-style Windows productivity experience referenced by the Microsoft Store listing. The Sotarium version uses a light, chat-first workspace with a conversation rail, persistent personal agents, colorful character avatars, tool handoffs, memory updates, and an interactive composer.
 
 ## Included
 
-The app includes the Sotarium navigation rail, Agents workspace, search and filters, favorites, grid/compact views, realistic agent cards, an agent detail drawer with Overview / Instructions / Activity tabs, inline editing, a create-agent modal, simulated run/toast feedback, and workspace settings with working toggles.
+The root route opens the chat workspace. `/download` opens a clean Sotarium download page whose button links to the Microsoft Store listing supplied for the reference app.
 
 ## Run locally
 

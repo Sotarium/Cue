@@ -359,3 +359,95 @@ h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 44px); line-height: 1.04; l
   .modal-footer { align-items: flex-start; flex-direction: column; }
   .modal-footer > div { width: 100%; justify-content: flex-end; }
 }
+
+/* Sotarium chat-first desktop experience */
+.sotarium-desktop { min-height: 100vh; display: flex; color: #252525; background: #fff; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.conversation-rail { width: 318px; min-width: 318px; display: flex; flex-direction: column; padding: 25px 14px 13px; border-right: 1px solid #ececec; background: #fbfbfb; }
+.rail-topline { display: flex; align-items: center; justify-content: space-between; padding: 0 10px 21px; }
+.rail-topline .brand { color: #292929; font-size: 21px; }
+.rail-topline .brand-mark { width: 21px; height: 21px; }
+.rail-actions { display: flex; gap: 3px; }
+.rail-actions button, .conversation-header-actions button { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; color: #5d5d5d; background: transparent; }
+.rail-actions button:hover, .conversation-header-actions button:hover { background: #f0f0f0; color: #1c1c1c; }
+.conversation-search { display: flex; align-items: center; gap: 8px; height: 34px; margin: 0 6px 15px; padding: 0 10px; border: 1px solid #e4e4e4; border-radius: 8px; color: #a4a4a4; background: #fff; }
+.conversation-search input { min-width: 0; flex: 1; padding: 0; border: 0; outline: 0; color: #333; background: transparent; font-size: 11px; box-shadow: none; }
+.conversation-search input::placeholder { color: #a7a7a7; }
+.conversation-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.conversation-row { min-width: 0; display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 8px; text-align: left; background: transparent; color: #252525; }
+.conversation-row:hover { background: #f1f1f1; }
+.conversation-row.active { background: #f0f0f0; }
+.conversation-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.conversation-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; }
+.conversation-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #8a8a8a; font-size: 10px; }
+.conversation-row time { align-self: flex-start; padding-top: 2px; color: #8e8e8e; font-size: 10px; white-space: nowrap; }
+.character-avatar { position: relative; flex: 0 0 auto; width: 45px; height: 45px; display: inline-block; border-radius: 30% 55% 36% 58%; transform: rotate(-7deg); box-shadow: inset -3px -3px 0 rgba(0,0,0,.07); overflow: hidden; }
+.character-avatar.small { width: 29px; height: 29px; border-radius: 32% 53% 35% 58%; }
+.character-avatar.blue { background: #5c9de8; }
+.character-avatar.brown { background: #ad846b; }
+.character-avatar.coral { background: #df6b62; }
+.character-avatar.yellow, .character-avatar.gold { background: #f5bd21; }
+.character-avatar.gray { background: #969696; }
+.character-avatar::before, .character-avatar::after { content: ''; position: absolute; top: 32%; width: 25%; height: 31%; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 5px #fff; }
+.character-avatar::before { left: 18%; }
+.character-avatar::after { right: 18%; }
+.character-avatar i, .character-avatar b { position: absolute; z-index: 1; display: block; width: 9%; height: 15%; top: 40%; border-radius: 50%; background: #2d2d2d; }
+.character-avatar i { left: 26%; }
+.character-avatar b { right: 26%; }
+.character-avatar.small i, .character-avatar.small b { width: 9%; height: 15%; }
+.character-avatar.double::before, .character-avatar.double::after { height: 26%; }
+.character-avatar.double i, .character-avatar.double b { top: 39%; }
+.rail-bottom { display: flex; flex-direction: column; gap: 6px; margin-top: auto; padding-top: 14px; border-top: 1px solid #ededed; }
+.memory-link, .profile-link { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 8px; color: #555; background: transparent; text-align: left; }
+.memory-link:hover, .profile-link:hover { background: #f0f0f0; }
+.memory-link span, .profile-link span:not(.profile-avatar) { font-size: 11px; }
+.memory-link small { margin-left: auto; color: #a0a0a0; font-size: 9px; }
+.profile-link > span:nth-child(2) { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.profile-link strong { font-size: 11px; font-weight: 600; }
+.profile-link small { color: #9b9b9b; font-size: 9px; }
+.profile-link > .icon { color: #aaa; transform: rotate(-90deg); }
+.profile-avatar { display: grid; place-items: center; width: 27px; height: 27px; border-radius: 50%; color: #fff; background: #202020; font-size: 9px; font-weight: 700; }
+.conversation-main { min-width: 0; flex: 1; display: flex; flex-direction: column; background: #fff; }
+.conversation-header { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 31px; border-bottom: 1px solid #f0f0f0; }
+.conversation-title { display: flex; align-items: center; gap: 10px; color: #242424; font-size: 14px; }
+.conversation-title .character-avatar { width: 28px; height: 28px; }
+.conversation-header-actions { display: flex; gap: 5px; }
+.message-stage { width: min(730px, calc(100% - 80px)); flex: 1; display: flex; flex-direction: column; gap: 18px; margin: 0 auto; padding: 42px 0 25px; overflow: auto; }
+.time-stamp { align-self: center; color: #a5a5a5; font-size: 10px; }
+.time-stamp.second { margin-top: 10px; }
+.user-message { align-self: flex-end; max-width: 82%; padding: 12px 16px; border-radius: 18px 18px 4px 18px; color: #333; background: #f0f0f0; font-size: 13px; line-height: 1.5; }
+.agent-message { max-width: 88%; color: #262626; font-size: 13px; line-height: 1.55; }
+.message-author { display: flex; align-items: center; gap: 9px; margin: 0 0 8px 1px; }
+.message-author strong { font-size: 13px; font-weight: 600; }
+.agent-message p { margin: 7px 0; }
+.quote-message, .handoff-message { padding: 10px 13px; border-radius: 10px; background: #cfe4fb; }
+.handoff-message { display: flex; align-items: center; gap: 7px; margin-top: 5px; background: #cfe4fb; }
+.handoff-message .character-avatar { width: 20px; height: 20px; }
+.handoff-message strong { color: #3e8bd6; font-weight: 500; }
+.handoff-message span { color: #222; }
+.agent-message.schedule { padding: 0 14px 12px; border-radius: 11px; background: #ededed; }
+.agent-message.schedule .message-author { margin: 0 -1px 8px -14px; padding-top: 0; }
+.agent-message.schedule p { margin: 8px 0; }
+.agent-message.schedule ul { margin: 3px 0 9px; padding-left: 20px; }
+.reaction-row { display: flex; align-items: center; gap: 5px; margin-top: 11px; }
+.reaction-row span, .reaction-row small { display: grid; place-items: center; min-width: 23px; height: 21px; padding: 0 5px; border: 1px solid #dedede; border-radius: 10px; background: #fff; font-size: 10px; }
+.reaction-row small { color: #888; }
+.sent-message { background: #e9f3ff; }
+.composer-wrap { width: min(730px, calc(100% - 80px)); margin: 0 auto; padding: 0 0 21px; }
+.composer { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid #dedede; border-radius: 15px; background: #fff; box-shadow: 0 5px 18px rgba(0,0,0,.05); }
+.composer > button:first-child { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #777; background: #f2f2f2; }
+.composer input { min-width: 0; flex: 1; padding: 8px 2px; border: 0; outline: 0; color: #222; background: transparent; font-size: 12px; box-shadow: none; }
+.composer input::placeholder { color: #aaa; }
+.send-button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: #242424; transform: rotate(-45deg); }
+.composer-hint { margin-top: 8px; color: #b0b0b0; text-align: center; font-size: 9px; }
+@media (max-width: 760px) {
+  .conversation-rail { width: 78px; min-width: 78px; padding: 18px 8px 10px; }
+  .rail-topline { justify-content: center; padding: 0 0 17px; }
+  .rail-topline .brand > span:last-child, .rail-actions, .conversation-search, .conversation-copy, .conversation-row time, .memory-link span, .memory-link small, .profile-link > span:nth-child(2), .profile-link > .icon { display: none; }
+  .conversation-row { justify-content: center; padding: 8px; }
+  .rail-bottom { align-items: center; }
+  .memory-link, .profile-link { padding: 7px; }
+  .conversation-header { padding: 0 17px; }
+  .message-stage, .composer-wrap { width: calc(100% - 34px); }
+  .message-stage { padding-top: 25px; }
+  .user-message, .agent-message { max-width: 95%; }
+}

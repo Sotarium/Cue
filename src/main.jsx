@@ -218,6 +218,52 @@ function DownloadPage() {
   return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Download</a></div></main>
 }
 
+const conversationSeeds = [
+  { id: 'resume', name: 'Resume Update', preview: 'Here’s a revised introduction that...', time: '19:53', tone: 'blue', agent: 'Atlas' },
+  { id: 'work', name: 'Work Assistant', preview: 'Your calendar is clear at 11:30 A...', time: '19:53', tone: 'brown', agent: 'Work Assistant' },
+  { id: 'tokyo', name: 'Tokyo Trip', preview: 'Here’s a draft plan for three days...', time: '14:32', tone: 'coral', agent: 'Scout' },
+  { id: 'birthday', name: 'Birthday Ideas', preview: 'What does your friend enjoy doin...', time: 'Thursday', tone: 'yellow', agent: 'Northstar' },
+  { id: 'reading', name: 'Weekend Reading', preview: 'Are you in the mood for a quick r...', time: 'Sep 22', tone: 'gray', agent: 'Relay' },
+  { id: 'movie', name: 'Movie Night', preview: 'Want something light and funny,...', time: 'Sep 22', tone: 'gold', agent: 'Pulse' },
+  { id: 'launch', name: 'Launch Planning', preview: 'I’ve built the timeline around the...', time: 'Sep 22', tone: 'blue', agent: 'Atlas' },
+  { id: 'grocery', name: 'Grocery List', preview: 'I’ve grouped everything by aisle.', time: 'Sep 21', tone: 'blue', agent: 'Scout' },
+  { id: 'english', name: 'English Practice', preview: 'Congrats on starting your first se...', time: 'Sep 21', tone: 'coral', agent: 'Relay' },
+]
+
+function CharacterAvatar({ tone = 'blue', small = false, double = false }) {
+  return <span className={`character-avatar ${tone} ${small ? 'small' : ''} ${double ? 'double' : ''}`}><i></i><b></b></span>
+}
+
+function SotariumWorkspace() {
+  const [active, setActive] = useState('launch')
+  const [draft, setDraft] = useState('')
+  const [search, setSearch] = useState('')
+  const [sent, setSent] = useState(false)
+  const activeConversation = conversationSeeds.find(item => item.id === active) || conversationSeeds[6]
+  const visibleConversations = conversationSeeds.filter(item => item.name.toLowerCase().includes(search.toLowerCase()))
+  const sendMessage = () => { if (!draft.trim()) return; setSent(true); setDraft('') }
+  return <div className="sotarium-desktop">
+    <aside className="conversation-rail">
+      <div className="rail-topline"><Logo /><div className="rail-actions"><button aria-label="New conversation"><Icon name="plus" size={18} /></button><button aria-label="Search conversations"><Icon name="search" size={17} /></button></div></div>
+      <label className="conversation-search"><Icon name="search" size={15} /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search conversations" /></label>
+      <div className="conversation-list">{visibleConversations.map(item => <button key={item.id} className={`conversation-row ${active === item.id ? 'active' : ''}`} onClick={() => { setActive(item.id); setSent(false) }}><CharacterAvatar tone={item.tone} small /><span className="conversation-copy"><strong>{item.name}</strong><small>{item.preview}</small></span><time>{item.time}</time></button>)}</div>
+      <div className="rail-bottom"><button className="memory-link"><Icon name="refresh" size={16} /><span>Memory</span><small>Updated today</small></button><button className="profile-link"><span className="profile-avatar">JD</span><span><strong>Jordan Davis</strong><small>Personal workspace</small></span><Icon name="chevron" size={15} /></button></div>
+    </aside>
+    <main className="conversation-main">
+      <header className="conversation-header"><div className="conversation-title"><CharacterAvatar tone={activeConversation.tone} small /><strong>{activeConversation.name}</strong></div><div className="conversation-header-actions"><button aria-label="Open computer"><Icon name="monitor" size={17} /></button><button aria-label="Open details"><Icon name="settings" size={17} /></button></div></header>
+      <div className="message-stage">
+        <div className="time-stamp">9:40</div>
+        <div className="user-message">Help me get ready for Friday’s launch. I need an announcement and a timeline.</div>
+        <div className="agent-message"><div className="message-author"><CharacterAvatar tone="blue" small /><strong>Copy Assistant</strong></div><p>Here’s a draft for the announcement:</p><div className="quote-message">“Meet your new team of agents. Bring them together in one chat to get more done.”</div><div className="handoff-message"><CharacterAvatar tone="gray" small /><strong>Schedule assistant</strong><span>Can you leave time for a copy review before we publish?</span></div></div>
+        <div className="time-stamp second">9:47</div>
+        <div className="agent-message schedule"><div className="message-author"><CharacterAvatar tone="gray" small /><strong>Schedule Assistant</strong></div><p>I’ve built the timeline around the copy review:</p><ul><li>Wednesday: review the announcement</li><li>Thursday: run final product checks</li><li>Friday: publish</li></ul><p>Does this timing work for you?</p><div className="reaction-row"><span>♥</span><span>👍</span><span>☺</span><span>💪</span><small>+2</small></div></div>
+        {sent && <div className="user-message sent-message">{sent === true ? 'Can you make the announcement a little warmer?' : sent}</div>}
+      </div>
+      <div className="composer-wrap"><div className="composer"><button aria-label="Add attachment"><Icon name="plus" size={18} /></button><input value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMessage()} placeholder="Message your agents" /><button className="send-button" onClick={sendMessage} aria-label="Send message"><Icon name="arrow" size={17} /></button></div><div className="composer-hint">Sotarium can bring the right agent into any conversation.</div></div>
+    </main>
+  </div>
+}
+
 function App() {
   const [activeSection, setActiveSection] = useState('agents')
   const [agents, setAgents] = useState(seedAgents)
@@ -232,8 +278,8 @@ function App() {
   const toggleFavorite = (id) => setAgents(current => current.map(agent => agent.id === id ? { ...agent, favorite: !agent.favorite } : agent))
   const saveAgent = (updated) => { setAgents(current => current.map(agent => agent.id === updated.id ? updated : agent)); setSelectedAgent(updated) }
   const createAgent = (newAgent) => { const agent = { ...newAgent, id: `${Date.now()}`, short: newAgent.name.split(' ')[0], description: `A focused ${newAgent.type.toLowerCase()} teammate, tuned for the way your team works.`, runs: '0', lastUsed: 'Not yet used', updated: 'Just now', status: 'Draft', tone: ['violet', 'mint', 'amber', 'blue'][agents.length % 4], avatar: newAgent.name.slice(0, 1).toUpperCase(), favorite: false, activity: ['Agent created and ready to shape'] }; setAgents(current => [agent, ...current]); setShowCreate(false); setSelectedAgent(agent); notify(`${agent.name} created`) }
-  if (window.location.pathname === '/' || window.location.pathname === '/download') return <DownloadPage />
-  return <div className="app-shell"><Sidebar activeSection={activeSection} onNavigate={navigate} onNewTask={() => setShowCreate(true)} /><main className="main-shell"><Topbar query={query} onSearch={value => { setQuery(value); setActiveSection('agents') }} onNewTask={() => setShowCreate(true)} onNavigate={navigate} />{activeSection === 'agents' ? <AgentsPage agents={agents} query={query} setQuery={setQuery} filter={filter} setFilter={setFilter} compact={compact} setCompact={setCompact} onSelect={setSelectedAgent} onFavorite={toggleFavorite} onCreate={() => setShowCreate(true)} /> : activeSection === 'settings' ? <SettingsView compact={compact} setCompact={setCompact} onToast={notify} /> : <SectionPlaceholder section={activeSection} onCreate={() => setShowCreate(true)} />}</main>{selectedAgent && <DetailDrawer agent={selectedAgent} onClose={() => setSelectedAgent(null)} onSave={saveAgent} onRun={() => notify(`${selectedAgent.name} is running`)} onToast={notify} />}{showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={createAgent} />}{toast && <div className="toast"><Icon name="checkCircle" size={16} /><span>{toast}</span></div>}</div>
+  if (window.location.pathname === '/download') return <DownloadPage />
+  return <SotariumWorkspace />
 }
 
 createRoot(document.getElementById('root')).render(<App />)
