@@ -5,5 +5,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   rollbuxRequest: (options) => ipcRenderer.invoke('rollbux-request', options),
   fetchLevel: (token) => ipcRenderer.invoke('fetch-level', token),
   fetchBalance: (token) => ipcRenderer.invoke('fetch-balance', token),
+  solveTurnstile: (token) => ipcRenderer.invoke('solve-turnstile', token),
   backendCall: (opts) => ipcRenderer.invoke('backend-call', opts),
 })

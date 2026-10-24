@@ -24,7 +24,7 @@ function extractLevelFromPayload(rawText, data) {
   return 1
 }
 
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, session } = require('electron')
 const path = require('path')
 const https = require('https')
 
@@ -35,20 +35,131 @@ if (!gotTheLock) {
   process.exit(0)
 }
 
-function makeRollbuxRequest({ path: apiPath, method = 'GET', body = null, token = '' }) {
+// ─── Cloudflare Clearance Cache ──────────────────────────────────────────────
+// Stores cf_clearance cookie value + expiry so we don't open a hidden window
+// on every single request — only when the cookie expires or a 403 is received.
+let cfClearanceCache = { value: '', expires: 0 }
+
+function isTurnstileResponse(statusCode, bodyText) {
+  return [403, 429, 503].includes(statusCode) &&
+    /cloudflare|turnstile|challenge|captcha|cf-chl/i.test(bodyText || '')
+}
+
+/**
+ * Opens a hidden BrowserWindow on rollbux.com with the user's session token
+ * already injected as a cookie. Cloudflare fingerprints the real Chromium
+ * engine and auto-passes the Turnstile challenge, issuing a cf_clearance cookie.
+ * We extract that cookie, cache it, and close the hidden window.
+ */
+async function solveTurnstileWithHiddenWindow(sessionToken) {
+  return new Promise((resolve) => {
+    console.log('[CF] Opening hidden window to solve Turnstile...')
+
+    const hiddenSes = session.fromPartition('persist:cf-solver', { cache: true })
+
+    // Pre-inject the user's session cookie so Cloudflare sees an authenticated session
+    hiddenSes.cookies.set({
+      url: 'https://rollbux.com',
+      name: 'authjs.session-token',
+      value: sessionToken.trim(),
+      domain: '.rollbux.com',
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax'
+    }).catch(() => {})
+
+    const win = new BrowserWindow({
+      width: 400,
+      height: 600,
+      show: false,          // Completely hidden
+      skipTaskbar: true,
+      webPreferences: {
+        session: hiddenSes,
+        nodeIntegration: false,
+        contextIsolation: true,
+        // Real browser fingerprint — no sandbox spoofing
+      }
+    })
+
+    let resolved = false
+    const finish = (clearance) => {
+      if (resolved) return
+      resolved = true
+      try { win.destroy() } catch (e) {}
+      resolve(clearance)
+    }
+
+    // Timeout after 20s — if CF doesn't clear in time, give up gracefully
+    const timeout = setTimeout(() => {
+      console.log('[CF] Turnstile solve timeout — proceeding without cf_clearance')
+      finish(null)
+    }, 20000)
+
+    // Poll cookies every 500ms looking for cf_clearance
+    const pollInterval = setInterval(async () => {
+      try {
+        const cookies = await hiddenSes.cookies.get({ url: 'https://rollbux.com' })
+        const cf = cookies.find(c => c.name === 'cf_clearance')
+        if (cf && cf.value) {
+          clearTimeout(timeout)
+          clearInterval(pollInterval)
+          console.log('[CF] cf_clearance obtained!')
+          // Cache for ~29 minutes (CF clearance lasts 30min by default)
+          cfClearanceCache = { value: cf.value, expires: Date.now() + 29 * 60 * 1000 }
+          finish(cf.value)
+        }
+      } catch (e) {}
+    }, 500)
+
+    win.on('closed', () => {
+      clearTimeout(timeout)
+      clearInterval(pollInterval)
+      if (!resolved) finish(null)
+    })
+
+    // Navigate to rollbux.com — Cloudflare will fingerprint and auto-solve
+    win.loadURL('https://rollbux.com', {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }).catch(() => finish(null))
+  })
+}
+
+/**
+ * Returns a valid cf_clearance value — from cache if still fresh,
+ * or by opening a hidden BrowserWindow to solve a new one.
+ */
+async function getCfClearance(sessionToken) {
+  if (cfClearanceCache.value && Date.now() < cfClearanceCache.expires) {
+    return cfClearanceCache.value
+  }
+  return await solveTurnstileWithHiddenWindow(sessionToken)
+}
+
+// ─── Core Request Function ────────────────────────────────────────────────────
+
+function makeRollbuxRequestRaw({ path: apiPath, method = 'GET', body = null, token = '', cfClearance = '' }) {
   return new Promise((resolve) => {
     const trimmed = (token || '').trim()
     const headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'application/json, text/plain, */*',
+      'Accept-Language': 'en-US,en;q=0.9',
       'Origin': 'https://rollbux.com',
       'Referer': 'https://rollbux.com/',
+      'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-origin',
     }
 
-    if (trimmed) {
-      headers['Cookie'] = `authjs.session-token=${trimmed}`
-      headers['Authorization'] = `Bearer ${trimmed}`
-    }
+    // Build cookie string
+    const cookieParts = []
+    if (trimmed) cookieParts.push(`authjs.session-token=${trimmed}`)
+    if (cfClearance) cookieParts.push(`cf_clearance=${cfClearance}`)
+    if (cookieParts.length) headers['Cookie'] = cookieParts.join('; ')
+    if (trimmed) headers['Authorization'] = `Bearer ${trimmed}`
 
     let payloadString = ''
     if (body) {
@@ -89,11 +200,32 @@ function makeRollbuxRequest({ path: apiPath, method = 'GET', body = null, token 
       resolve({ statusCode: 408, ok: false, error: 'Request timeout' })
     })
 
-    if (payloadString) {
-      req.write(payloadString)
-    }
+    if (payloadString) req.write(payloadString)
     req.end()
   })
+}
+
+/**
+ * Smart wrapper: makes the request, and if Cloudflare blocks it (403/Turnstile),
+ * automatically opens a hidden window to get cf_clearance and retries once.
+ */
+async function makeRollbuxRequest({ path: apiPath, method = 'GET', body = null, token = '' }) {
+  // First attempt — use cached cf_clearance if available
+  const cachedCf = (cfClearanceCache.value && Date.now() < cfClearanceCache.expires)
+    ? cfClearanceCache.value : ''
+
+  const res = await makeRollbuxRequestRaw({ path: apiPath, method, body, token, cfClearance: cachedCf })
+
+  // If blocked by Cloudflare/Turnstile, solve and retry
+  if (isTurnstileResponse(res.statusCode, res.text)) {
+    console.log(`[CF] Turnstile detected on ${apiPath} (HTTP ${res.statusCode}) — solving...`)
+    const newCf = token ? await getCfClearance(token) : null
+    if (newCf) {
+      return await makeRollbuxRequestRaw({ path: apiPath, method, body, token, cfClearance: newCf })
+    }
+  }
+
+  return res
 }
 
 function verifyRollbuxSession(token) {
@@ -237,6 +369,15 @@ app.whenReady().then(() => {
     })
   })
 
+  // Manually trigger Turnstile solve (e.g. called from renderer when a 403 is detected)
+  ipcMain.handle('solve-turnstile', async (_event, token) => {
+    try {
+      const cf = await getCfClearance((token || '').trim())
+      return { ok: !!cf, cf_clearance: cf }
+    } catch (e) {
+      return { ok: false, error: e.message }
+    }
+  })
 
   // Proxy call to Rollbux Vercel backend (rollbux-one.vercel.app)
   ipcMain.handle('backend-call', async (_event, { endpoint, method = 'POST', body = null }) => {
