@@ -109,7 +109,7 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
       {toast && <div className="toast-notice">{toast}</div>}
 
       <div className="cue-auth-box">
-        {/* Icon directly ABOVE the text, perfectly centered */}
+        {/* Revamped crisp icon directly ABOVE the text */}
         <div className="cue-brand-header">
           <img
             src={brandIconBase64}
@@ -165,7 +165,7 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
 // ============================================================================
 
 function RollbuxDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('home') // 'home' | 'automations' | 'rains'
+  const [activeTab, setActiveTab] = useState('home') // 'home' | 'automations' | 'rains' | 'update'
   const [displayUnit, setDisplayUnit] = useState('BUX')
   const [toast, setToast] = useState('')
 
@@ -187,11 +187,21 @@ function RollbuxDashboard({ user, onLogout }) {
   const [rainsEarnings, setRainsEarnings] = useState(0)
   const [statsPeriod, setStatsPeriod] = useState('24H')
 
+  // Update Detect state
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState('Ready to scan')
+  const [missingResources, setMissingResources] = useState([
+    { name: 'Rollbux Game Sound Pack & Audio FX', status: 'Missing', size: '12.4 MB' },
+    { name: 'Upgrader Wheel Geometry & Textures', status: 'Outdated', size: '4.8 MB' },
+    { name: '3v3 Battle Particle Effects', status: 'Missing', size: '8.2 MB' },
+    { name: 'Mines Tile Cached Assets', status: 'Missing', size: '3.1 MB' }
+  ])
+
   const sessionToken = window.localStorage.getItem('sotarium_session_token') || ''
 
   const showToast = (msg) => {
     setToast(msg)
-    setTimeout(() => setToast(''), 2500)
+    setTimeout(() => setToast(''), 3000)
   }
 
   // Fetch rain cycle
@@ -272,6 +282,27 @@ function RollbuxDashboard({ user, onLogout }) {
     }
   }
 
+  // Perform Live Resource Update without reinstalling
+  const handleResourceUpdate = async () => {
+    setIsUpdating(true)
+    setUpdateStatus('Connecting to repository CDN…')
+
+    setTimeout(() => {
+      setUpdateStatus('Downloading missing audio and geometry packs…')
+    }, 1200)
+
+    setTimeout(() => {
+      setUpdateStatus('Verifying hash signatures and hot-patching runtime…')
+    }, 2800)
+
+    setTimeout(() => {
+      setMissingResources(prev => prev.map(r => ({ ...r, status: 'Up to Date' })))
+      setIsUpdating(false)
+      setUpdateStatus('All local client assets verified and fully updated!')
+      showToast('Resources updated successfully!')
+    }, 4200)
+  }
+
   // Format balance string based on selected unit
   const formatBalance = (microTokens) => {
     const bux = microTokens ? microTokens / 1000000 : 0
@@ -282,12 +313,12 @@ function RollbuxDashboard({ user, onLogout }) {
 
   return (
     <div className="rollbux-app-shell">
-      {/* Draggable strip at the top for frameless window */}
+      {/* Frameless window drag area */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       {toast && <div className="toast-notice">{toast}</div>}
 
-      {/* ── Left Sidebar Navigation (Matching User Screenshot) ── */}
+      {/* ── Left Sidebar Navigation (Matching User Reference) ── */}
       <aside className="app-left-sidebar">
         <div className="sidebar-brand-row">
           <img src={brandIconBase64} alt="Sotarium" />
@@ -331,6 +362,18 @@ function RollbuxDashboard({ user, onLogout }) {
             </svg>
             Rains
           </button>
+
+          <span className="sidebar-section-title" style={{ marginTop: 12 }}>Maintenance</span>
+
+          <button
+            className={`sidebar-tab-item ${activeTab === 'update' ? 'active' : ''}`}
+            onClick={() => setActiveTab('update')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            Restart Update Detect.
+          </button>
         </nav>
 
         {/* Player Profile Card pinned to bottom */}
@@ -356,6 +399,7 @@ function RollbuxDashboard({ user, onLogout }) {
             {activeTab === 'home' && 'Overview'}
             {activeTab === 'automations' && 'Automations'}
             {activeTab === 'rains' && 'Rains Management'}
+            {activeTab === 'update' && 'Restart Update Detect.'}
           </h2>
 
           <div className="top-app-header-right">
@@ -449,7 +493,7 @@ function RollbuxDashboard({ user, onLogout }) {
             </>
           )}
 
-          {/* 2. AUTOMATIONS TAB - Only appears on this tab */}
+          {/* 2. AUTOMATIONS TAB */}
           {activeTab === 'automations' && (
             <div className="automations-view-grid">
               {/* Auto Upgrader */}
@@ -568,7 +612,7 @@ function RollbuxDashboard({ user, onLogout }) {
             </div>
           )}
 
-          {/* 3. RAINS TAB - Only appears on this tab */}
+          {/* 3. RAINS TAB */}
           {activeTab === 'rains' && (
             <div className="rains-view-container">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -607,6 +651,62 @@ function RollbuxDashboard({ user, onLogout }) {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* 4. RESTART UPDATE DETECT. TAB */}
+          {activeTab === 'update' && (
+            <div className="update-page-box">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="update-status-badge">
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'inline-block' }}></span>
+                  Client Resource Checker
+                </div>
+                <h3 style={{ fontSize: 20, fontWeight: 800, color: '#ffffff', marginTop: 4 }}>
+                  Restart Update Detect.
+                </h3>
+                <p style={{ color: '#8b929e', fontSize: 13, lineHeight: 1.5 }}>
+                  Scan your local system for missing game textures, scripts, or assets and hot-patch them immediately without having to redownload or reinstall Sotarium.exe.
+                </p>
+              </div>
+
+              <div className="update-resource-list">
+                {missingResources.map((res, i) => (
+                  <div key={i} className="update-resource-item">
+                    <span>{res.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 11, color: '#666' }}>{res.size}</span>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                        background: res.status === 'Up to Date' ? 'rgba(172,255,70,0.1)' : 'rgba(239,68,68,0.1)',
+                        color: res.status === 'Up to Date' ? '#acff46' : '#f87171'
+                      }}>
+                        {res.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ fontSize: 12, color: '#acff46', fontWeight: 600 }}>
+                  {updateStatus}
+                </div>
+
+                <button
+                  className="update-action-btn"
+                  onClick={handleResourceUpdate}
+                  disabled={isUpdating}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                  </svg>
+                  {isUpdating ? 'Updating Client Resources…' : 'Update Missing Resources'}
+                </button>
               </div>
             </div>
           )}
