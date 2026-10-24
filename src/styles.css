@@ -37,7 +37,7 @@ input:focus, textarea:focus, select:focus { border-color: rgba(169,147,255,.72);
 .sidebar-top { padding: 0 9px; }
 .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 21px; font-weight: 700; letter-spacing: -.05em; color: var(--text); }
 .brand-dot { color: #4aa5ff; }
-.brand-mark { position: relative; width: 28px; height: 28px; display: block; border: 0; border-radius: 50%; background: #3d9df2; clip-path: polygon(50% 0%, 68% 12%, 90% 9%, 100% 32%, 91% 51%, 100% 72%, 84% 91%, 62% 87%, 47% 100%, 27% 88%, 8% 92%, 0% 69%, 10% 50%, 1% 29%, 20% 10%, 40% 13%); transform: none; }
+.brand-mark { position: relative; width: 28px; height: 28px; display: block; border: 0; border-radius: 50%; background: linear-gradient(145deg, #55b2ff, #2b83e3); box-shadow: inset 0 1px 2px rgba(255,255,255,.32), 0 2px 8px rgba(44,136,229,.25); transform: none; }
 .brand-mark i { position: absolute; display: block; width: 4px; height: 4px; border-radius: 50%; background: #fff; }
 .brand-mark i:nth-child(1) { width: 10px; height: 10px; left: 7px; top: 8px; }
 .brand-mark i:nth-child(2) { width: 4px; height: 4px; right: 6px; top: 8px; background: #13233c; }
@@ -279,8 +279,7 @@ h1 { margin: 10px 0 8px; font-size: clamp(30px, 4vw, 44px); line-height: 1.04; l
 .download-card { width: min(360px, 100%); display: flex; flex-direction: column; align-items: center; text-align: center; }
 .download-logo { display: flex; flex-direction: column; align-items: center; gap: 13px; margin-bottom: 24px; }
 .download-logo strong { font-size: 39px; line-height: 1; letter-spacing: -.065em; }
-.download-mark { position: relative; z-index: 0; isolation: isolate; width: 49px; height: 49px; display: block; border-radius: 50%; background: #3d9df2; clip-path: polygon(50% 0%, 68% 12%, 90% 9%, 100% 32%, 91% 51%, 100% 72%, 84% 91%, 62% 87%, 47% 100%, 27% 88%, 8% 92%, 0% 69%, 10% 50%, 1% 29%, 20% 10%, 40% 13%); }
-.download-mark::before { content: ''; position: absolute; z-index: -1; inset: -15px -24px -18px -24px; border: 16px solid #ed2024; border-right-color: transparent; border-radius: 50%; transform: rotate(-28deg); }
+.download-mark { position: relative; width: 49px; height: 49px; display: block; border-radius: 50%; background: linear-gradient(145deg, #55b2ff, #2b83e3); box-shadow: inset 0 2px 3px rgba(255,255,255,.34), inset 0 -3px 5px rgba(9,70,145,.15), 0 8px 18px rgba(36,126,221,.22); }
 .download-mark i { position: absolute; display: block; border-radius: 50%; }
 .download-mark i:nth-child(1) { width: 17px; height: 17px; left: 13px; top: 15px; background: #fff; }
 .download-mark i:nth-child(2) { width: 7px; height: 7px; left: 18px; top: 20px; background: #20242b; }
