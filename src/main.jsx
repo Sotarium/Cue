@@ -70,17 +70,10 @@ function DownloadPage() {
   )
 }
 
-function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = null }) {
-  const [mode, setMode] = useState(initialMode)
+function CueAuthPage({ onAuthSuccess }) {
   const [sessionCookie, setSessionCookie] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [toast, setToast] = useState('')
-
-  const showToast = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(''), 3500)
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -89,12 +82,6 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
     const tokenToUse = sessionCookie.trim()
     if (!tokenToUse) {
       setError('Please enter your authjs.session-token')
-      return
-    }
-
-    if (mode === 'signup' && registeredToken) {
-      setMode('login')
-      showToast('You Already Have An Account.')
       return
     }
 
@@ -118,8 +105,6 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
     <div className="cue-auth-screen">
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
-      {toast && <div className="toast-notice">{toast}</div>}
-
       <div className="cue-auth-box">
         <div className="cue-brand-header">
           <img
@@ -130,7 +115,7 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
           <span className="cue-brand-wordmark">Sotarium</span>
         </div>
 
-        <h1 className="cue-auth-title">{mode === 'signup' ? 'Sign up' : 'Log in'}</h1>
+        <h1 className="cue-auth-title">Log in</h1>
 
         <form className="cue-auth-form" onSubmit={handleSubmit}>
           <input
@@ -155,17 +140,6 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
         </form>
 
         {error && <p className="cue-error-msg">{error}</p>}
-
-        <button
-          type="button"
-          className="cue-mode-switch"
-          onClick={() => {
-            setMode(mode === 'signup' ? 'login' : 'signup')
-            setError('')
-          }}
-        >
-          {mode === 'signup' ? 'Already have an account? Log in' : 'Need an account? Sign up'}
-        </button>
       </div>
     </div>
   )
@@ -390,7 +364,7 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
 
 function RollbuxDashboard({ user, onLogout }) {
   const [currentUnit, setCurrentUnit] = useState('BUX')
-  const [toast, setToast] = useState('')
+  // toast disabled
   const [activeTab, setActiveTab] = useState('24h')
   const [sideTab, setSideTab] = useState('home') // 'home' | 'automations' | 'rains'
 
@@ -422,10 +396,7 @@ function RollbuxDashboard({ user, onLogout }) {
 
   const sessionToken = window.localStorage.getItem('sotarium_session_token') || ''
 
-  const showToast = (msg) => {
-    setToast(msg)
-    setTimeout(() => setToast(''), 3000)
-  }
+  const showToast = () => {}
 
   // Fetch rain data: live cycle (public) + user transactions from backend
   const [rainCycle, setRainCycle] = useState(null) // { secondsLeft, potBux }
@@ -798,7 +769,7 @@ function RollbuxDashboard({ user, onLogout }) {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 9999 }} />
 
       {/* Toast */}
-      {toast && <div className="toast-notice">{toast}</div>}
+      
 
       {/* ── Left sidebar nav ── */}
       <div style={{ width: 220, minWidth: 220, flexShrink: 0, background: '#0b0e17', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 44, paddingBottom: 24, paddingLeft: 12, paddingRight: 12, gap: 4 }}>
@@ -1341,8 +1312,6 @@ function DesktopApp() {
     return (
       <CueAuthPage
         onAuthSuccess={(user) => setCurrentUser(user)}
-        initialMode={registeredToken ? 'login' : 'signup'}
-        registeredToken={registeredToken}
       />
     )
   }
