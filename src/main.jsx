@@ -45,7 +45,7 @@ function DownloadPage() {
   return (
     <main className="download-page">
       <div className="download-card">
-        <img src={brandIconBase64} alt="Sotarium" style={{ width: 64, height: 64, marginBottom: 16 }} />
+        <img src={brandIconBase64} alt="Sotarium" style={{ width: 64, height: 64, marginBottom: 16, display: 'block', margin: '0 auto 16px auto' }} />
         <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 8 }}>Sotarium</h1>
         <p style={{ color: '#888', fontSize: 13, marginBottom: 20 }}>Personal Rollbux Automation Workspace</p>
         <a className="download-button" href="https://github.com/Sotarium/Cue/releases/latest/download/Sotarium.exe">Download for Windows</a>

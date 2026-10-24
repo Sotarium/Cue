@@ -217,6 +217,9 @@ input[type=number] {
   background: #242424;
 }
 .download-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   max-width: 320px;
 }
