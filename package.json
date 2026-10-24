@@ -12,26 +12,40 @@
     "preview": "vite preview --host 0.0.0.0",
     "desktop:build": "npm run build && electron-builder --win portable --x64"
   },
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest",
     "@vitejs/plugin-react": "latest",
     "vite": "latest",
     "react": "latest",
     "react-dom": "latest"
   },
-  "devDependencies": {
-    "electron": "latest",
-    "electron-builder": "latest"
-  },
   "build": {
     "appId": "com.sotarium.app",
     "productName": "Sotarium",
-    "files": ["dist/**/*", "electron/**/*", "package.json"],
-    "directories": { "output": "release" },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/sotarium-icon.ico"
     },
     "portable": {
       "artifactName": "Sotarium.exe"
-    }
+    },
+    "compression": "maximum"
   }
 }

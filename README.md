@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-The dev server listens on port 5173. The production build is verified with `npm run build`. To package the Windows app, run `npm run desktop:build`; the portable executable is written to `release/Sotarium.exe`.
+The dev server listens on port 5173. The production build is verified with `npm run build`. To package the Windows app, run `npm run desktop:build`; the portable executable is written to `release/Sotarium.exe`. Electron uses relative Vite asset paths so the packaged file-based app renders correctly, the browser-only React/Vite packages stay out of the runtime bundle, and the Windows build uses maximum compression plus the Sotarium homepage icon.
 
 ## Notes
 
