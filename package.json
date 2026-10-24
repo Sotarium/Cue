@@ -1,7 +1,7 @@
 {
   "name": "sotarium-agent",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Sotarium personal agent workspace for Windows",
   "author": "Sotarium",
   "type": "module",
@@ -44,8 +44,10 @@
       "icon": "build/sotarium-icon.ico"
     },
     "portable": {
-      "artifactName": "Sotarium.exe"
+      "artifactName": "Sotarium.exe",
+      "splashImage": null,
+      "useZip": false
     },
-    "compression": "maximum"
+    "compression": "store"
   }
 }

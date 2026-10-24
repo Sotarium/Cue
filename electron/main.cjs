@@ -2,6 +2,13 @@ const { app, BrowserWindow, ipcMain, session } = require('electron')
 const path = require('path')
 const https = require('https')
 
+// Ensure single instance to prevent duplicate processes or flashing
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+  app.quit()
+  process.exit(0)
+}
+
 function verifyRollbuxSession(token) {
   return new Promise((resolve) => {
     if (!token || typeof token !== 'string' || token.trim().length < 5) {
@@ -72,13 +79,16 @@ function verifyRollbuxSession(token) {
   })
 }
 
+let mainWindow = null
+
 function createWindow() {
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
     minWidth: 1024,
     minHeight: 720,
     backgroundColor: '#121418',
+    show: false, // Don't show until rendered to avoid flashes
     autoHideMenuBar: true,
     title: 'Sotarium',
     webPreferences: {
@@ -89,20 +99,32 @@ function createWindow() {
     },
   })
 
-  window.webContents.once('did-finish-load', async () => {
+  // Show only when ready to avoid flashing or opening/closing appearances
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show()
+  })
+
+  mainWindow.webContents.once('did-finish-load', async () => {
     if (process.env.SOTARIUM_SMOKE === '1') {
-      const bodyText = await window.webContents.executeJavaScript('document.body.innerText')
+      const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText')
       console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
       app.quit()
     }
   })
 
-  window.webContents.once('did-fail-load', (_event, errorCode, errorDescription) => {
+  mainWindow.webContents.once('did-fail-load', (_event, errorCode, errorDescription) => {
     if (process.env.SOTARIUM_SMOKE === '1') console.error(`SOTARIUM_SMOKE_FAIL ${errorCode} ${errorDescription}`)
   })
 
-  window.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
 }
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
 
 app.whenReady().then(() => {
   ipcMain.handle('verify-session', async (_event, token) => {
