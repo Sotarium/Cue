@@ -215,7 +215,7 @@ function CreateModal({ onClose, onCreate }) {
 }
 
 function DownloadPage() {
-  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><p>Open the workspace and start shaping your AI teammates.</p><a className="download-button" href="https://github.com/Sotarium/Cue/archive/refs/heads/main.zip" download>Download</a><a className="workspace-link" href="/agents">Open workspace <Icon name="arrow" size={14} /></a></div></main>
+  return <main className="download-page"><div className="download-card"><div className="download-logo"><span className="download-mark"><i></i><i></i><i></i><i></i><i></i><i></i></span><strong>Sotarium</strong></div><h1>Download Sotarium</h1><a className="download-button" href="https://apps.microsoft.com/detail/9PDXFBWZNTNJ?hl=en-us&gl=CA&ocid=pdpshare">Download</a></div></main>
 }
 
 function App() {
