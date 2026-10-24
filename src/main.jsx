@@ -359,22 +359,28 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Live level polling — scrape /profile actively every 10 seconds
-  const [liveLevel, setLiveLevel] = useState(user.level || 1)
-  const [levelBadge, setLevelBadge] = useState(user.level || 1)
+  // Live level polling — scrape /profile actively every 8 seconds
+  const [liveLevel, setLiveLevel] = useState(user.level || user.raw?.level || 1)
+  const [levelBadge, setLevelBadge] = useState(user.level || user.raw?.level || 1)
   useEffect(() => {
     const token = window.localStorage.getItem('sotarium_session_token') || ''
     const doFetch = async () => {
       if (window.electronAPI?.fetchLevel) {
         const res = await window.electronAPI.fetchLevel(token)
-        if (res.ok && res.level !== null) {
+        if (res && res.ok && res.level !== null && res.level > 0) {
           setLiveLevel(res.level)
           if (res.badge) setLevelBadge(res.badge)
+          // Also update user profile cache
+          try {
+            const cached = JSON.parse(window.localStorage.getItem('sotarium_user_profile') || '{}')
+            cached.level = res.level
+            window.localStorage.setItem('sotarium_user_profile', JSON.stringify(cached))
+          } catch (e) {}
         }
       }
     }
     doFetch()
-    const interval = setInterval(doFetch, 10000)
+    const interval = setInterval(doFetch, 8000)
     return () => clearInterval(interval)
   }, [])
 
@@ -1118,11 +1124,33 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const [hasUpdated, setHasUpdated] = useState(false)
+  const CURRENT_APP_VERSION = '1.0.5'
+  const [showUpdate, setShowUpdate] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
 
   const registeredToken = window.localStorage.getItem('sotarium_registered_token')
+
+  // Check if a real new version is available on GitHub
+  useEffect(() => {
+    const checkActualUpdate = async () => {
+      try {
+        const lastAcknowledged = window.localStorage.getItem('sotarium_acknowledged_version')
+        const res = await fetch('https://api.github.com/repos/Sotarium/Cue/releases/latest')
+        if (res.ok) {
+          const data = await res.json()
+          const latestTag = (data.tag_name || '').replace(/^v/, '').trim()
+          if (latestTag && latestTag !== CURRENT_APP_VERSION && latestTag !== lastAcknowledged) {
+            setShowUpdate(true)
+            return
+          }
+        }
+      } catch (e) {
+        // Offline or GitHub rate limit, skip update screen
+      }
+    }
+    checkActualUpdate()
+  }, [])
 
   useEffect(() => {
     const token = window.localStorage.getItem('sotarium_session_token')
@@ -1157,11 +1185,12 @@ function DesktopApp() {
     setCurrentUser(null)
   }
 
-  if (!hasUpdated) {
+  if (showUpdate) {
     return (
       <UpdateDetectedScreen
         onComplete={() => {
-          setHasUpdated(true)
+          window.localStorage.setItem('sotarium_acknowledged_version', '1.0.6')
+          setShowUpdate(false)
         }}
       />
     )

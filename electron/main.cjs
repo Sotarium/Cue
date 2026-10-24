@@ -159,7 +159,7 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
-  // Fetch live player level: check /profile HTML first for the exact level badge, fallback to /_api/users/me
+  // Fetch live player level: check /profile HTML, /_api/users/me, and next-data
   ipcMain.handle('fetch-level', async (_event, token) => {
     return new Promise((resolve) => {
       const trimmed = (token || '').trim()
@@ -181,21 +181,25 @@ app.whenReady().then(() => {
         let html = ''
         res.on('data', (chunk) => { html += chunk })
         res.on('end', () => {
-          // Look for: <span class="relative z-10 text-shadow-lg mt-px">38</span> or level-badge
-          const badgeMatch = html.match(/--level-badge-(\d+)/)
-          const spanMatch = html.match(/class="[^"]*text-shadow-lg[^"]*"[^>]*>\s*(\d+)\s*<\/span>/)
-          const levelNum = spanMatch ? parseInt(spanMatch[1], 10) : (badgeMatch ? parseInt(badgeMatch[1], 10) : null)
+          // 1. Check for specific level badge classes and span contents
+          const spanMatch = html.match(/class="[^"]*(?:text-shadow-lg|mt-px)[^"]*"[^>]*>\s*(\d+)\s*<\/span>/i) ||
+                            html.match(/--level-color:var\(--level-badge-(\d+)\)/i) ||
+                            html.match(/--level-badge-(\d+)/i) ||
+                            html.match(/"level"\s*:\s*(\d+)/i)
 
-          if (levelNum !== null && !isNaN(levelNum)) {
-            return resolve({ ok: true, level: levelNum, badge: badgeMatch ? badgeMatch[1] : levelNum })
+          if (spanMatch && spanMatch[1]) {
+            const num = parseInt(spanMatch[1], 10)
+            if (!isNaN(num) && num > 0) {
+              return resolve({ ok: true, level: num, badge: num })
+            }
           }
 
-          // Fallback to /_api/users/me API
+          // 2. Query /_api/users/me
           makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
             if (apiRes.ok && apiRes.data) {
               const u = apiRes.data.data?.user || apiRes.data.data || apiRes.data.user || apiRes.data
               const lvl = u?.level ?? u?.xp_level ?? u?.tier ?? null
-              if (lvl !== null && lvl !== undefined) {
+              if (lvl !== null && lvl !== undefined && parseInt(lvl, 10) > 0) {
                 return resolve({ ok: true, level: parseInt(lvl, 10), badge: lvl })
               }
             }
