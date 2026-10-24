@@ -252,6 +252,18 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
   const [hoveredPoint, setHoveredPoint] = useState(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
+  const formatTooltipDate = (isoOrMs) => {
+    if (!isoOrMs) return ''
+    const d = new Date(isoOrMs)
+    if (isNaN(d.getTime())) return ''
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const day = d.getDate()
+    const m = months[d.getMonth()]
+    const h = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${day} ${m} ${h}:${min}`
+  }
+
   const handleMouseMove = (e) => {
     if (!chartPoints || chartPoints.length < 2) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -271,8 +283,13 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
 
     const pointPixelX = (closest.x / width) * rect.width
     const pointPixelY = (closest.y / height) * rect.height
+
+    const tooltipX = Math.max(50, Math.min(rect.width - 50, pointPixelX))
+    const isNearBottom = pointPixelY >= (rect.height * 0.75)
+    const tooltipY = isNearBottom ? (pointPixelY + 14) : Math.max(8, pointPixelY - 58)
+
     setHoveredPoint(closest)
-    setTooltipPos({ x: pointPixelX, y: Math.max(10, pointPixelY - 55) })
+    setTooltipPos({ x: tooltipX, y: tooltipY })
   }
 
   const handleMouseLeave = () => {
@@ -310,7 +327,7 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
           <path d={fillD} fill="url(#chartGradient)" />
           <path d={pathD} fill="none" stroke="#7974FF" strokeWidth="2.5" />
 
-          {/* Hover Crosshair & Indicator */}
+          {/* Hover Crosshair & Indicator matching Rollbux */}
           {hoveredPoint && (
             <>
               <line
@@ -318,22 +335,21 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
                 y1="0"
                 x2={hoveredPoint.x}
                 y2={height}
-                stroke="#ffffff"
+                stroke="rgba(255,255,255,0.35)"
                 strokeWidth="1.5"
                 strokeDasharray="4 4"
-                opacity="0.4"
               />
               <circle
                 cx={hoveredPoint.x}
                 cy={hoveredPoint.y}
-                r="10"
+                r="8"
                 fill="#7974FF"
-                opacity="0.25"
+                opacity="0.3"
               />
               <circle
                 cx={hoveredPoint.x}
                 cy={hoveredPoint.y}
-                r="5"
+                r="4.5"
                 fill="#ffffff"
                 stroke="#7974FF"
                 strokeWidth="2.5"
@@ -342,24 +358,21 @@ function InteractiveGraph({ maxVal, width, height, fillD, pathD, chartPoints, fo
           )}
         </svg>
 
-        {/* Floating Tooltip */}
+        {/* Pixel-perfect Rollbux Hover Tooltip Box */}
         {hoveredPoint && (
           <div
-            className="pointer-events-none absolute z-20 flex flex-col items-start gap-1 rounded-lg bg-[#121622] border border-white/10 px-2.5 py-1.5 shadow-2xl transition-all duration-75 transform -translate-x-1/2 select-none"
+            className="pointer-events-none absolute z-30 flex flex-col items-start gap-1 rounded-lg bg-[#121622] border border-white/10 px-2.5 py-1.5 shadow-2xl transition-all duration-75 transform -translate-x-1/2 select-none"
             style={{ left: tooltipPos.x, top: tooltipPos.y }}
           >
-            <span className="text-[11px] font-semibold text-[#9aa3a8] leading-none">{hoveredPoint.time}</span>
+            <span className="text-[11px] font-semibold text-[#9aa3a8] leading-none">
+              {formatTooltipDate(hoveredPoint.rawTime || hoveredPoint.timestamp || Date.now())}
+            </span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <img src="./figma/token-bux.png" alt="Coin" className="size-3.5 object-contain" />
-              <span className="text-[13px] font-black text-white font-mono leading-none">
+              <span className="text-[14px] font-black tracking-tight text-white leading-none font-mono">
                 {formatBuxValue(hoveredPoint.cumulative)}
               </span>
             </div>
-            {hoveredPoint.earning > 0 && (
-              <span className="text-[10px] font-bold text-[#50f07b] leading-none">
-                +{formatBuxValue(hoveredPoint.earning)}
-              </span>
-            )}
           </div>
         )}
       </div>
@@ -931,7 +944,8 @@ function RollbuxDashboard({ user, onLogout }) {
                               return {
                                 cumulative,
                                 earning: t.amount_bux || 0,
-                                time: t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Rain'
+                                rawTime: t.timestamp || Date.now(),
+                                timestamp: t.timestamp || Date.now()
                               }
                             })
 
