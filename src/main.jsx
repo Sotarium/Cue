@@ -423,9 +423,18 @@ function RollbuxDashboard({ user, onLogout }) {
   const [rainCycle, setRainCycle] = useState(null) // { secondsLeft, potBux }
   const [rainTxs, setRainTxs] = useState([])       // actual earned rain transactions
 
-  const deleteRainTx = async (txTimestamp, txIndex) => {
-    // Optimistic UI update
+  const deleteRainTx = (txTimestamp, txIndex) => {
     const targetTx = rainTxs[txIndex] || rainTxs.find(t => t.timestamp === txTimestamp)
+    
+    // Save to permanent local blacklist in localStorage
+    try {
+      const savedBlacklist = JSON.parse(window.localStorage.getItem('sotarium_deleted_rains') || '[]')
+      if (txTimestamp && !savedBlacklist.includes(String(txTimestamp))) savedBlacklist.push(String(txTimestamp))
+      if (targetTx?.id && !savedBlacklist.includes(String(targetTx.id))) savedBlacklist.push(String(targetTx.id))
+      if (targetTx?.cycle_id && !savedBlacklist.includes(String(targetTx.cycle_id))) savedBlacklist.push(String(targetTx.cycle_id))
+      window.localStorage.setItem('sotarium_deleted_rains', JSON.stringify(savedBlacklist))
+    } catch (e) {}
+
     setRainTxs(prev => prev.filter((t, idx) => {
       if (txTimestamp && t.timestamp === txTimestamp) return false
       if (idx === txIndex) return false
@@ -433,29 +442,10 @@ function RollbuxDashboard({ user, onLogout }) {
     }))
     setRains(prev => prev.filter((_, idx) => idx !== txIndex))
     showToast('Rain transaction removed')
-
-    try {
-      if (window.electronAPI?.backendCall) {
-        await window.electronAPI.backendCall({
-          endpoint: '/api/status',
-          method: 'POST',
-          body: {
-            action: 'delete_transaction',
-            username: user.username,
-            timestamp: txTimestamp || undefined,
-            index: txIndex !== undefined ? txIndex : undefined,
-            cycle_id: targetTx ? targetTx.cycle_id : undefined,
-            signature: targetTx ? `${targetTx.amount_bux}_${targetTx.time || ''}` : undefined
-          }
-        })
-      }
-    } catch (e) {
-      console.error('Failed to sync rain deletion:', e)
-    }
   }
 
   const fetchRains = async () => {
-    // 1. Live cycle — public endpoint
+    // 1. Live cycle from rollbux
     try {
       const res = await fetch('https://rollbux.com/_api/rain/current')
       if (res.ok) {
@@ -470,27 +460,45 @@ function RollbuxDashboard({ user, onLogout }) {
       }
     } catch (e) {}
 
-    // 2. User transactions from backend (rain history)
+    // 2. Direct Rollbux Official API for User Rain Transactions (rollbux.com/_api/users/me/transactions)
     try {
-      if (window.electronAPI?.backendCall) {
-        const res = await window.electronAPI.backendCall({
-          endpoint: `/api/user/${encodeURIComponent(user.username)}`,
+      const token = window.localStorage.getItem('sotarium_session_token') || sessionToken
+      if (window.electronAPI?.rollbuxRequest && token) {
+        const res = await window.electronAPI.rollbuxRequest({
+          path: '/_api/users/me/transactions',
           method: 'GET',
-          body: null
+          token
         })
-        if (res.ok && res.data?.user) {
-          if (res.data.solPrice) setSolPrice(res.data.solPrice)
-          const txs = res.data.user.transactions || []
-          setRainTxs(txs)
-          setRains(txs.map((t, i) => ({
-            id: t.cycle_id || i,
+        if (res.ok && res.data) {
+          const items = res.data.data?.items || res.data.items || []
+          const blacklist = JSON.parse(window.localStorage.getItem('sotarium_deleted_rains') || '[]')
+
+          const filteredRains = items
+            .filter(t => t.type === 'RAIN_REWARD')
+            .map((t, idx) => {
+              const ts = typeof t.date === 'number' ? t.date : new Date(t.date || t.created_at || Date.now()).getTime()
+              return {
+                id: t.id || `${user.username}_${ts}`,
+                account: user.username,
+                amount_bux: parseFloat(((t.amount || 0) / 1000000).toFixed(2)),
+                timestamp: ts,
+                time: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            })
+            .filter(t => !blacklist.includes(String(t.timestamp)) && !blacklist.includes(String(t.id)))
+
+          setRainTxs(filteredRains)
+          setRains(filteredRains.map((t, i) => ({
+            id: t.id || i,
             amount: t.amount_bux || 0,
             ends_at: t.timestamp,
-            account: t.account || user.username
+            account: t.account
           })))
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to fetch transactions from Rollbux official API:', e)
+    }
   }
 
   useEffect(() => {
@@ -1086,10 +1094,6 @@ function RollbuxDashboard({ user, onLogout }) {
                         <div className="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
                       </label>
                     </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
-                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">All Accounts</button>
-                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
                       <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black rounded-lg transition active:scale-95 cursor-pointer">Play</button>
@@ -1127,10 +1131,6 @@ function RollbuxDashboard({ user, onLogout }) {
                         <span className="px-2 py-0.5 rounded bg-[#acff46]/10 border border-[#acff46]/20 text-[11px] font-extrabold text-[#acff46]">3v3</span>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
-                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">2 Accs</button>
-                    </div>
                     <div className="flex items-center gap-2 pt-1">
                       <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
                       <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 cursor-pointer">Create</button>
@@ -1151,10 +1151,6 @@ function RollbuxDashboard({ user, onLogout }) {
                     </label>
                   </div>
                   <div className="flex flex-col gap-3 rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
-                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">All Accounts</button>
-                    </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-black text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
                       <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black rounded-lg transition active:scale-95 cursor-pointer">Play</button>
