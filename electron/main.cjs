@@ -277,6 +277,42 @@ const AUTO_RAIN_SCRIPT = `
   if (window.__sotariumAutoRainRunning) return;
   window.__sotariumAutoRainRunning = true;
 
+  // ── Step 1: Click the Chat nav button to open the rain/chat section ──────
+  function findChatButton() {
+    const allBtns = document.querySelectorAll('button');
+    for (const btn of allBtns) {
+      const spans = btn.querySelectorAll('span');
+      for (const span of spans) {
+        if ((span.textContent || '').trim().toLowerCase() === 'chat') return btn;
+      }
+    }
+    return null;
+  }
+
+  function clickChatTab() {
+    const chatBtn = findChatButton();
+    if (chatBtn) {
+      console.log('[Sotarium AutoRain] Clicking Chat tab...');
+      chatBtn.click();
+      chatBtn.style.outline = '3px solid #acff46';
+      setTimeout(() => { if (chatBtn) chatBtn.style.outline = ''; }, 1500);
+      return true;
+    }
+    return false;
+  }
+
+  // Try clicking the Chat tab — retry until it appears (SPA may not have rendered it yet)
+  let chatClicked = false;
+  const chatRetry = setInterval(() => {
+    if (!chatClicked && clickChatTab()) {
+      chatClicked = true;
+      clearInterval(chatRetry);
+    }
+  }, 500);
+  // Give up after 10s if Chat tab never appears
+  setTimeout(() => clearInterval(chatRetry), 10000);
+
+  // ── Step 2: Watch for Join Rain button ────────────────────────────────────
   let lastClicked = 0;
   const COOLDOWN_MS = 8000;
 
@@ -308,7 +344,7 @@ const AUTO_RAIN_SCRIPT = `
 
   setInterval(tryClick, 400);
   new MutationObserver(() => tryClick()).observe(document.body, { childList: true, subtree: true });
-  console.log('[Sotarium AutoRain] Watching for Join Rain button...');
+  console.log('[Sotarium AutoRain] Watching for Chat tab + Join Rain button...');
 })();
 `
 
