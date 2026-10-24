@@ -437,135 +437,120 @@ function RollbuxDashboard({ user, onLogout }) {
   ]
 
   return (
-    <div className="flex w-full min-h-screen selection:bg-[#acff46] selection:text-[#0e131f]">
-      {/* Draggable header strip for frameless window */}
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
+    <div style={{ display: 'flex', width: '100%', minHeight: '100vh', background: '#121418' }} className="selection:bg-[#acff46] selection:text-[#0e131f]">
+      {/* Drag region for frameless window */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 9999 }} />
 
+      {/* Toast */}
       {toast && <div className="toast-notice">{toast}</div>}
 
-      {/* Left Sidebar Navigation */}
-      <div style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="flex flex-col min-h-screen bg-[#0b0e17] border-r border-white/[0.04] pt-[40px] pb-6 px-3 gap-2 shrink-0">
+      {/* ── Left sidebar nav ── */}
+      <div style={{ width: 220, minWidth: 220, flexShrink: 0, background: '#0b0e17', borderRight: '1px solid rgba(255,255,255,0.04)', display: 'flex', flexDirection: 'column', minHeight: '100vh', paddingTop: 44, paddingBottom: 24, paddingLeft: 12, paddingRight: 12, gap: 4 }}>
         {/* Brand */}
-        <div className="flex items-center gap-2.5 px-3 mb-4">
-          <img src={brandIconBase64} alt="Sotarium" style={{ width: 30, height: 30, objectFit: 'contain' }} />
-          <span className="text-[16px] font-black italic text-white tracking-tight">Sotarium</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px', marginBottom: 16 }}>
+          <img src={brandIconBase64} alt="Sotarium" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+          <span style={{ fontSize: 15, fontWeight: 900, fontStyle: 'italic', color: '#fff', letterSpacing: '-0.3px' }}>Sotarium</span>
         </div>
-        {/* Nav tabs */}
-        <div className="flex flex-col gap-1">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setSideTab(item.id)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold transition cursor-pointer w-full text-left ${sideTab === item.id ? 'bg-[#131a29] text-white border border-white/[0.06]' : 'text-[#9aa3a8] hover:text-white hover:bg-white/[0.03]'}` }
-            >
-              <span className={sideTab === item.id ? 'text-[#acff46]' : ''}>{item.icon}</span>
-              {item.label}
-              {sideTab === item.id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#acff46]"></span>}
-            </button>
-          ))}
-        </div>
+
+        {/* Nav items */}
+        {[
+          { id: 'home', label: 'Home', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> },
+          { id: 'automations', label: 'Automations', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> },
+          { id: 'rains', label: 'Rains', icon: <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg> },
+        ].map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setSideTab(item.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', width: '100%', textAlign: 'left', transition: 'all 0.15s',
+              background: sideTab === item.id ? '#131a29' : 'transparent',
+              color: sideTab === item.id ? '#fff' : '#9aa3a8',
+              border: sideTab === item.id ? '1px solid rgba(255,255,255,0.06)' : '1px solid transparent',
+            }}
+          >
+            <span style={{ color: sideTab === item.id ? '#acff46' : 'inherit', display: 'flex' }}>{item.icon}</span>
+            {item.label}
+            {sideTab === item.id && <span style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'block' }} />}
+          </button>
+        ))}
+
         {/* Spacer */}
-        <div className="flex-1" />
-        {/* User card at bottom */}
-        <div className="px-2 py-3 rounded-xl bg-[#131a29] border border-white/[0.05] flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-[#acff46]/20 border border-[#acff46]/30 flex items-center justify-center shrink-0">
-            <span className="text-[12px] font-black text-[#acff46]">{user.username?.[0]?.toUpperCase() || 'S'}</span>
+        <div style={{ flex: 1 }} />
+
+        {/* User card */}
+        <div style={{ padding: '10px 12px', borderRadius: 12, background: '#131a29', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
           </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-[12px] font-bold text-white truncate">{user.username}</span>
-            <span className="text-[10px] text-[#9aa3a8]">Lvl {user.level}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
+            <span style={{ fontSize: 10, color: '#9aa3a8' }}>Lvl {user.level}</span>
           </div>
         </div>
       </div>
 
-      {/* Main content area */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-y-auto" style={{ height: '100vh' }}>
+      {/* ── Main content ── */}
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', height: '100vh' }}>
 
-      
-      {/* Tab: Home */}
-      {sideTab === 'home' && 
-      <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8">
-        <div className="flex w-full flex-col items-start gap-[28px]">
-          
-          {/* Header */}
-          <div className="flex w-full flex-col items-center justify-center">
-            <div className="flex w-full items-center justify-between">
-              <div className="flex w-full shrink-0 flex-col items-start gap-[20px]">
-                <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-[12px]">
-                  <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                    <button
-                      onClick={onLogout}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                      </svg>
-                      Log Out
-                    </button>
-                    <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
-                  </div>
+        {/* ════ HOME TAB ════ */}
+        {sideTab === 'home' && (
+          <div className="flex w-full justify-center pb-[40px] pt-[35px]">
+            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+
+              {/* Header */}
+              <div className="flex w-full shrink-0 flex-wrap items-center gap-[12px]">
+                <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    Log Out
+                  </button>
+                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Layout Body */}
-          <div className="flex w-full flex-col items-start">
-            <div className="flex w-full flex-col items-start">
+              {/* Body: left sidebar + right content */}
               <div className="flex w-full flex-col items-start gap-[24px] lg:flex-row lg:gap-[28px]">
-                
-                {/* Left Sidebar: Referral Code & Accounts */}
+
+                {/* Left sidebar */}
                 <div className="flex w-full shrink-0 flex-col items-start gap-[16px] lg:w-[300px] xl:w-[320px]">
-                  
-                  {/* Referral Code Card */}
+
+                  {/* Referral card */}
                   <div className="relative flex w-full flex-col items-start gap-[16px] overflow-clip rounded-[12px] bg-[#0e131f] p-[24px] shadow-sm border border-white/[0.03]">
                     <p className="whitespace-nowrap text-[16px] font-bold leading-[24px] text-white">Your Referral code</p>
-                    
-                    <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
-                      <div className="flex w-full shrink-0 flex-col items-start gap-[10px]">
-                        
-                        {/* Referral Code Box */}
-                        <div className="relative flex w-full shrink-0 items-center justify-between overflow-clip rounded-[7px] px-[12px] py-[10px] bg-[#131a29]">
-                          <span className="font-mono text-[14px] font-bold leading-[20px] tracking-[1px] text-[#acff46]">{user.username}</span>
-                          <div className="relative flex items-center gap-2 z-10">
-                            <button onClick={() => showToast('Edit referral code')} type="button" className="text-[11px] font-semibold text-[#9aa3a8] hover:text-[#acff46] transition cursor-pointer">Edit</button>
-                            <button onClick={handleCopyCode} type="button" className="text-[12px] font-semibold leading-[18px] text-[#9aa3a8] transition hover:text-white cursor-pointer">
-                              {copiedCode ? 'Copied!' : 'Copy'}
-                            </button>
-                          </div>
+                    <div className="flex w-full flex-col gap-[10px]">
+                      <div className="relative flex w-full items-center justify-between overflow-clip rounded-[7px] px-[12px] py-[10px] bg-[#131a29]">
+                        <span className="font-mono text-[14px] font-bold leading-[20px] tracking-[1px] text-[#acff46]">{user.username}</span>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => showToast('Edit referral code')} type="button" className="text-[11px] font-semibold text-[#9aa3a8] hover:text-[#acff46] transition cursor-pointer">Edit</button>
+                          <button onClick={handleCopyCode} type="button" className="text-[12px] font-semibold text-[#9aa3a8] hover:text-white transition cursor-pointer">{copiedCode ? 'Copied!' : 'Copy'}</button>
                         </div>
-
-                        {/* Referral Link Box */}
-                        <button onClick={handleCopyLink} type="button" className="group relative flex w-full shrink-0 items-center justify-between gap-[8px] overflow-clip rounded-[7px] px-[12px] py-[10px] text-left transition hover:brightness-110 active:scale-[0.99] bg-[#131a29] cursor-pointer">
-                          <span className="relative min-w-0 truncate text-[14px] font-medium leading-[20px] text-[#9aa3a8]">https://rollbux.com/r/{user.username.toLowerCase()}</span>
-                          <span className="relative size-[20px] shrink-0 transition group-hover:scale-105">
-                            <img alt="Copy link" className="absolute inset-0 block size-full max-w-none opacity-80 group-hover:opacity-100" src="/figma/af-copy.svg" />
-                          </span>
-                        </button>
-
                       </div>
+                      <button onClick={handleCopyLink} type="button" className="group relative flex w-full items-center justify-between gap-[8px] overflow-clip rounded-[7px] px-[12px] py-[10px] text-left bg-[#131a29] hover:brightness-110 active:scale-[0.99] transition cursor-pointer">
+                        <span className="relative min-w-0 truncate text-[14px] font-medium text-[#9aa3a8]">https://rollbux.com/r/{user.username.toLowerCase()}</span>
+                        <span className="relative size-[20px] shrink-0">
+                          <img alt="Copy" className="absolute inset-0 block size-full opacity-80 group-hover:opacity-100" src="/figma/af-copy.svg" />
+                        </span>
+                      </button>
                     </div>
                   </div>
 
-                  {/* Currency Switcher Pill */}
+                  {/* Currency switcher */}
                   <div className="w-full flex items-center justify-between bg-[#0e131f] p-3 rounded-[12px] border border-white/[0.03] text-[12px]">
                     <span className="text-[#9aa3a8] font-medium">Display Unit:</span>
                     <div className="flex gap-1 bg-[#131a29] p-1 rounded-md">
-                      {['BUX', 'USD', 'SOL'].map((unit) => (
-                        <button
-                          key={unit}
-                          onClick={() => setCurrentUnit(unit)}
-                          type="button"
-                          className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === unit ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}
-                        >
+                      {['BUX', 'USD', 'SOL'].map(unit => (
+                        <button key={unit} onClick={() => setCurrentUnit(unit)} type="button"
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === unit ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}>
                           {unit}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  {/* Accounts Infos Card */}
+                  {/* Accounts Infos */}
                   <div className="relative flex w-full flex-col items-start gap-[12px] overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] shadow-sm border border-white/[0.03]">
                     <div className="flex w-full items-center justify-between">
                       <span className="text-[14px] font-bold text-white">Accounts Infos</span>
@@ -573,23 +558,19 @@ function RollbuxDashboard({ user, onLogout }) {
                         <span className="text-[11px] font-medium text-gray-400">Auto Messages</span>
                         <label className="relative inline-flex items-center cursor-pointer select-none">
                           <input type="checkbox" defaultChecked className="sr-only peer" />
-                          <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                          <div className="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
                         </label>
                       </div>
                     </div>
-                    
-                    {/* Live Account Row */}
                     <div className="flex w-full flex-col gap-2 pt-1 border-t border-white/[0.04]">
                       <div className="flex items-center justify-between py-1">
                         <div className="flex items-center gap-1.5">
                           <span className="text-[12px] font-bold text-[#acff46]">{user.username} :</span>
-                          <span className="text-[13px] font-black tracking-tight leading-none text-[#acff46]">3 / 3</span>
+                          <span className="text-[13px] font-black text-[#acff46]">3 / 3</span>
                         </div>
                         <span className="text-[10px] font-mono text-gray-500">Active</span>
                       </div>
                     </div>
-
-                    {/* Next Message Countdown Circle */}
                     <div className="flex w-full flex-col items-center justify-center py-2 border-t border-white/[0.04] gap-1">
                       <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Next Message In</span>
                       <div className="relative flex items-center justify-center size-[96px] mt-1">
@@ -603,395 +584,115 @@ function RollbuxDashboard({ user, onLogout }) {
                         </div>
                       </div>
                     </div>
-
-                    {/* Buttons Row */}
                     <div className="grid grid-cols-2 gap-2 pt-2 w-full border-t border-white/[0.04]">
-                      <button onClick={() => showToast('Account token is configured')} type="button" className="w-full py-2 bg-[#acff46] hover:bg-[#96e036] text-[#121418] rounded-lg text-xs font-bold transition shadow-sm active:scale-95 text-center cursor-pointer">
-                        Token
-                      </button>
-                      <button onClick={() => showToast('Accounts registered: 1')} className="w-full py-2 bg-gradient-to-r from-[#a855f7] to-[#8b5cf6] hover:brightness-110 text-white rounded-lg text-xs font-bold transition shadow-sm active:scale-95 text-center flex items-center justify-center cursor-pointer">
-                        <span>Accounts</span>
-                      </button>
+                      <button onClick={() => showToast('Account token is configured')} type="button" className="w-full py-2 bg-[#acff46] hover:bg-[#96e036] text-[#121418] rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer">Token</button>
+                      <button onClick={() => showToast('Accounts registered: 1')} className="w-full py-2 bg-gradient-to-r from-[#a855f7] to-[#8b5cf6] hover:brightness-110 text-white rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer">Accounts</button>
                     </div>
                   </div>
                 </div>
 
-                {/* Right Main Content */}
+                {/* Right content: Overview + Stats */}
                 <div className="flex flex-1 min-w-0 w-full flex-col items-start gap-[24px]">
-                  
-                  {/* Overview Section */}
-                  <div className="flex w-full shrink-0 flex-col items-start justify-center gap-[16px]">
-                    <div className="flex w-full shrink-0 items-center justify-between">
-                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Overview</p>
-                      <button onClick={() => showToast('Overview metrics reset')} type="button" className="relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[14px] py-[6px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
-                        <span>Clear</span>
-                      </button>
-                    </div>
 
-                    {/* 4 Stats Cards Grid */}
+                  {/* Overview */}
+                  <div className="flex w-full flex-col gap-[16px]">
+                    <div className="flex w-full items-center justify-between">
+                      <p className="text-[20px] font-bold italic text-white">Overview</p>
+                      <button onClick={() => showToast('Overview metrics reset')} type="button" className="flex h-[32px] items-center justify-center rounded-[7px] px-[14px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] w-full">
-                      {/* 1. Rains Joined */}
-                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
-                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">Rains Joined</p>
-                        <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0 Rains</p>
+                      <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium text-[#9aa3a8]">Rains Joined</p>
+                        <p className="text-[20px] font-bold text-white">0 Rains</p>
                       </div>
-
-                      {/* 2. How Much Time */}
-                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
-                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">How Much Time</p>
-                        <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0S</p>
+                      <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium text-[#9aa3a8]">How Much Time</p>
+                        <p className="text-[20px] font-bold text-white">0S</p>
                       </div>
-
-                      {/* 3. Total Earnings */}
-                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
-                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">Total Earnings</p>
-                        <div className="flex shrink-0 items-center gap-[8px]">
+                      <div className="relative flex w-full flex-col gap-[6px] rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium text-[#9aa3a8]">Total Earnings</p>
+                        <div className="flex items-center gap-[8px]">
                           <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
-                          <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0.00</p>
+                          <p className="text-[20px] font-bold text-white">0.00</p>
                         </div>
                       </div>
-
-                      {/* 4. Current Balance */}
-                      <div className="relative flex w-full items-center justify-between gap-[12px] overflow-clip rounded-[12px] border border-solid border-[rgba(172,255,70,0.12)] px-[20px] py-[16px] bg-[#0e131f]">
-                        <div className="relative flex min-w-0 shrink flex-col items-start gap-[6px]">
-                          <p className="whitespace-nowrap text-[14px] font-medium leading-[20px] text-[#acff46]">Current Balance</p>
-                          <div className="flex shrink-0 items-center gap-[8px]">
+                      <div className="relative flex w-full items-center justify-between gap-[12px] rounded-[12px] border border-[rgba(172,255,70,0.12)] px-[20px] py-[16px] bg-[#0e131f]">
+                        <div className="flex min-w-0 flex-col gap-[6px]">
+                          <p className="text-[14px] font-medium text-[#acff46]">Current Balance</p>
+                          <div className="flex items-center gap-[8px]">
                             <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
-                            <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">
-                              {formatValue(user.token_balance)}
-                            </p>
+                            <p className="text-[20px] font-bold text-white">{formatValue(user.token_balance)}</p>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Statistics + Auto Upgrader + Auto Battle Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_270px_270px] gap-5 w-full items-start">
-                    
-                    {/* Left: Statistics Section */}
-                    <div className="flex w-full min-w-0 flex-col items-start gap-[16px]">
-                      <div className="flex w-full shrink-0 items-center justify-between">
-                        <p className="whitespace-nowrap text-[20px] font-bold italic leading-[30px] text-white">Statistics</p>
-                        <div className="flex items-center gap-3">
-                          <button onClick={() => showToast('Stats graph cleared')} type="button" className="relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[14px] py-[6px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
-                            <span>Clear</span>
-                          </button>
-                          <div className="relative flex shrink-0 items-center gap-[2px] rounded-[8px] p-[2px] bg-[#0e131f] border border-white/[0.04]">
-                            {['24H', 'Week', 'Month'].map((tab) => (
-                              <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab.toLowerCase())}
-                                type="button"
-                                className={`relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[8px] transition cursor-pointer ${activeTab === tab.toLowerCase() ? 'bg-[#131a29] text-white font-semibold' : 'text-[#9aa3a8] hover:text-white'}`}
-                              >
-                                <span className="text-[14px]">{tab}</span>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Chart Container Card */}
-                      <div className="relative flex w-full shrink-0 flex-col items-start justify-center overflow-clip rounded-[12px] p-[24px] border border-white/[0.03] bg-[#0e131f]">
-                        <div className="custom-scroll relative h-[348px] w-full shrink-0 overflow-x-auto overflow-y-clip">
-                          <div className="relative h-full w-full min-w-[500px]">
-                            {/* Y-Axis Labels */}
-                            <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] whitespace-nowrap text-[12px] font-bold text-[#6d7680]">
-                              <p className="leading-[18px]">100</p>
-                              <p className="leading-[18px]">&nbsp;</p>
-                              <p className="leading-[18px]">&nbsp;</p>
-                              <p className="leading-[18px]">&nbsp;</p>
-                              <p className="leading-[18px]">&nbsp;</p>
-                              <p className="leading-[18px]">&nbsp;</p>
-                              <p className="leading-[18px] text-white font-bold">0</p>
-                            </div>
-
-                            {/* SVG Chart Area */}
-                            <div className="absolute cursor-crosshair" style={{ left: 56, top: 9, width: 'calc(100% - 56px)', height: 330 }}>
-                              <svg className="absolute inset-0 size-full" viewBox="0 0 744 330" preserveAspectRatio="none">
-                                <line x1="0" y1="20" x2="744" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                <line x1="0" y1="130" x2="744" y2="130" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                <line x1="0" y1="240" x2="744" y2="240" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                                <path d="M 0 330 L 744 330" fill="none" stroke="#7974FF" strokeWidth="2.5" />
-                              </svg>
-                            </div>
-                          </div>
+                  {/* Statistics */}
+                  <div className="flex w-full flex-col gap-[16px]">
+                    <div className="flex w-full items-center justify-between">
+                      <p className="text-[20px] font-bold italic text-white">Statistics</p>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => showToast('Stats cleared')} type="button" className="flex h-[32px] items-center justify-center rounded-[7px] px-[14px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear</button>
+                        <div className="flex items-center gap-[2px] rounded-[8px] p-[2px] bg-[#0e131f] border border-white/[0.04]">
+                          {['24H', 'Week', 'Month'].map(tab => (
+                            <button key={tab} onClick={() => setActiveTab(tab.toLowerCase())} type="button"
+                              className={`flex h-[32px] items-center justify-center rounded-[7px] px-[12px] transition cursor-pointer ${activeTab === tab.toLowerCase() ? 'bg-[#131a29] text-white font-semibold' : 'text-[#9aa3a8] hover:text-white'}`}>
+                              <span className="text-[14px]">{tab}</span>
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </div>
-
-                    {/* Middle: Clean Auto Upgrader GUI */}
-                    <div className="flex w-full flex-col items-start gap-[16px]">
-                      <div className="flex w-full shrink-0 items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Upgrader</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${upgraderActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
-                            {upgraderActive ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer select-none">
-                          <input type="checkbox" checked={upgraderActive} onChange={e => setUpgraderActive(e.target.checked)} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                        </label>
-                      </div>
-
-                      {/* Clean Card Box */}
-                      <div className="relative flex w-full flex-col items-center justify-center gap-4 overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
-                        {/* Wheel */}
-                        <div className="relative flex flex-col items-center justify-center w-full select-none py-2">
-                          <div className="relative size-[210px] flex items-center justify-center">
-                            <svg className="size-full overflow-visible" viewBox="0 0 200 200">
-                              <circle cx="100" cy="100" r="78" fill="#0c0f17" stroke="#181d2a" strokeWidth="15" />
-                              <circle cx="100" cy="100" r="78" fill="none" stroke="#8b5cf6" strokeWidth="15" strokeDasharray="220.5 490.09" transform="rotate(-90 100 100)" />
-                              <circle cx="100" cy="22" r="6.5" fill="#ffffff" stroke="#8b5cf6" strokeWidth="2" />
+                    <div className="relative flex w-full flex-col items-start justify-center overflow-clip rounded-[12px] p-[24px] border border-white/[0.03] bg-[#0e131f]">
+                      <div className="custom-scroll relative h-[348px] w-full overflow-x-auto overflow-y-clip">
+                        <div className="relative h-full w-full min-w-[500px]">
+                          <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] text-[12px] font-bold text-[#6d7680]">
+                            <p>100</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p>&nbsp;</p><p className="text-white font-bold">0</p>
+                          </div>
+                          <div className="absolute cursor-crosshair" style={{ left: 56, top: 9, width: 'calc(100% - 56px)', height: 330 }}>
+                            <svg className="absolute inset-0 size-full" viewBox="0 0 744 330" preserveAspectRatio="none">
+                              <line x1="0" y1="20" x2="744" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                              <line x1="0" y1="130" x2="744" y2="130" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                              <line x1="0" y1="240" x2="744" y2="240" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                              <path d="M 0 330 L 744 330" fill="none" stroke="#7974FF" strokeWidth="2.5" />
                             </svg>
-                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-                              <span className="text-[34px] font-black text-white tracking-tight leading-none">45.00%</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Multiplier Target */}
-                        <div className="relative z-10 flex flex-col gap-1.5 w-full">
-                          <div className="flex items-center justify-between text-[11px] font-black tracking-tight text-[#9aa3a8]">
-                            <span>MULTIPLIER TARGET</span>
-                            <span className="text-white font-black">{upgraderMultiplier.toFixed(2)}x</span>
-                          </div>
-                          <div className="relative flex items-center">
-                            <input
-                              type="number"
-                              min="1.1"
-                              max="100"
-                              step="0.05"
-                              value={upgraderMultiplier}
-                              onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)}
-                              className="w-full bg-[#131a29] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-black tracking-tight focus:border-[#8b5cf6] outline-none"
-                            />
-                            <span className="absolute right-3 text-xs text-gray-400 font-black">x</span>
-                          </div>
-                        </div>
-
-                        {/* Auto Random */}
-                        <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-xs font-black tracking-tight text-white">Auto Random</span>
-                          <label className="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" checked={upgraderRandom} onChange={e => setUpgraderRandom(e.target.checked)} className="sr-only peer" />
-                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
-                          </label>
-                        </div>
-
-                        {/* Auto Sell */}
-                        <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-xs font-black tracking-tight text-white">Auto Sell</span>
-                          <label className="relative inline-flex items-center cursor-pointer select-none">
-                            <input type="checkbox" checked={upgraderAutoSell} onChange={e => setUpgraderAutoSell(e.target.checked)} className="sr-only peer" />
-                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
-                          </label>
-                        </div>
-
-                        {/* Account Selector */}
-                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black tracking-tight">
-                            <span>All Accounts</span>
-                          </button>
-                        </div>
-
-                        {/* Feedback + Manual Play Button */}
-                        <div className="relative z-10 flex items-center gap-2 w-full">
-                          <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
-                          <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
-                            Play
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right: Clean Auto Battle GUI & Mines */}
-                    <div className="flex w-full flex-col items-start gap-[16px]">
-                      <div className="flex w-full shrink-0 items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Auto Battle</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${battleActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
-                            {battleActive ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer select-none">
-                          <input type="checkbox" checked={battleActive} onChange={e => setBattleActive(e.target.checked)} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                        </label>
-                      </div>
-
-                      {/* Clean Battle Card Box */}
-                      <div className="relative flex w-full flex-col items-center justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
-                        {/* Borrow Mode */}
-                        <div className="relative z-10 w-full">
-                          <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
-                            <span className="font-semibold text-xs text-white">Borrow Mode</span>
-                            <input type="checkbox" checked={battleBorrow} onChange={e => setBattleBorrow(e.target.checked)} className="sr-only peer" />
-                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#acff46]"></div>
-                          </label>
-                        </div>
-
-                        {/* Crazy Mode */}
-                        <div className="relative z-10 w-full">
-                          <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
-                            <span className="font-semibold text-xs text-white">50/50 Crazy Mode</span>
-                            <input type="checkbox" checked={battleCrazy} onChange={e => setBattleCrazy(e.target.checked)} className="sr-only peer" />
-                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
-                          </label>
-                        </div>
-
-                        {/* Modifiers */}
-                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Modifiers</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-[11px] font-extrabold text-yellow-400">JACKPOT</span>
-                            <span className="px-2 py-0.5 rounded bg-[#acff46]/10 border border-[#acff46]/20 text-[11px] font-extrabold text-[#acff46]">3v3</span>
-                          </div>
-                        </div>
-
-                        {/* Account Selector */}
-                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">
-                            <span>2 Accs</span>
-                          </button>
-                        </div>
-
-                        {/* Create Battle Button */}
-                        <div className="relative z-10 flex items-center gap-2 w-full pt-1">
-                          <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
-                          <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
-                            Create
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Auto Mines Card */}
-                      <div className="flex w-full shrink-0 items-center justify-between mt-2">
-                        <div className="flex items-center gap-2">
-                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Mines</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${minesActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
-                            {minesActive ? 'Active' : 'Disabled'}
-                          </span>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer select-none">
-                          <input type="checkbox" checked={minesActive} onChange={e => setMinesActive(e.target.checked)} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                        </label>
-                      </div>
-
-                      <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
-                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">
-                            <span>All Accounts</span>
-                          </button>
-                        </div>
-                        <div className="relative z-10 flex items-center gap-2 w-full">
-                          <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
-                          <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
-                            Play
-                          </button>
-                        </div>
-                      </div>
-
-                    </div>
-
-                  </div>
-
-                  {/* Rains Section */}
-                  <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
-                    <div className="flex w-full shrink-0 items-center justify-between">
-                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Rains</p>
-                      <div className="flex items-center gap-3">
-                        <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
-                          <span>Clear Rains</span>
-                        </button>
-                        <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
-                      <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
-                        <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
-                          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
-                            <div>Account</div>
-                            <div className="text-center">Time Left</div>
-                            <div className="text-center">Amount</div>
-                            <div className="text-right pr-2">Time</div>
-                            <div className="text-center"></div>
-                          </div>
-                          
-                          <div className="flex flex-col divide-y divide-white/[0.02]">
-                            {rains.length === 0 ? (
-                              <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
-                                <p className="text-[13px] leading-[20px] text-[#9aa3a8]">Nobody is using your code yet. Share the link above — a referee appears here as soon as they attach it.</p>
-                              </div>
-                            ) : (
-                              rains.map((rain, i) => (
-                                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
-                                  <span className="truncate text-[15px] font-bold italic tracking-[0.3px] text-[#acff46]">{user.username}</span>
-                                  <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
-                                  <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
-                                  <span className="text-right pr-2">
-                                    <span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">
-                                      Active Cycle
-                                    </span>
-                                  </span>
-                                </div>
-                              ))
-                            )}
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Game History Section */}
-                  <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
-                    <div className="flex w-full shrink-0 items-center justify-between">
-                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Game History</p>
+                  {/* Game History */}
+                  <div className="flex w-full flex-col gap-[16px]">
+                    <div className="flex w-full items-center justify-between">
+                      <p className="text-[20px] font-bold italic text-white">Game History</p>
                       <div className="flex items-center gap-3">
-                        <button onClick={() => { setGameHistory([]); showToast('Game history cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#7c3aed] text-white font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
-                          <span>Clear History</span>
-                        </button>
+                        <button onClick={() => { setGameHistory([]); showToast('Game history cleared'); }} type="button" className="flex h-[30px] items-center justify-center rounded-[7px] px-[12px] bg-[#7c3aed] text-white font-bold text-[12px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear History</button>
                         <span className="text-[13px] text-[#9aa3a8]">{gameHistory.length} rounds</span>
                       </div>
                     </div>
-                    <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
-                      <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
-                        <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
-                          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
-                            <div>Account</div>
-                            <div className="text-center">Mode</div>
-                            <div className="text-center">Result</div>
-                            <div className="text-center">Amount</div>
-                            <div className="text-right pr-2">Time</div>
-                          </div>
-                          <div className="flex flex-col divide-y divide-white/[0.02]">
-                            {gameHistory.length === 0 ? (
-                              <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
-                                <p className="text-[13px] leading-[20px] text-[#9aa3a8]">No game rounds yet. Start Auto Upgrader, Battle, or Mines to see history here.</p>
-                              </div>
-                            ) : (
-                              gameHistory.map((item, i) => (
-                                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02]">
-                                  <span className="truncate text-[14px] font-bold italic text-white">{item.account}</span>
-                                  <span className="text-center text-[13px] font-bold text-[#7974FF]">{item.mode}</span>
-                                  <span className="text-center">
-                                    <span className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase ${item.success ? 'bg-[#acff46]/10 text-[#acff46]' : 'bg-red-500/10 text-red-400'}`}>
-                                      {item.success ? 'Success' : 'Loss'}
-                                    </span>
-                                  </span>
-                                  <span className="text-center text-[13px] font-bold text-[#c2c6db]">{item.amount} BUX</span>
-                                  <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{item.time}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
+                    <div className="custom-scroll w-full overflow-x-auto overflow-y-hidden">
+                      <div className="relative w-full min-w-[650px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                        <div className="grid grid-cols-5 items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
+                          <div>Account</div><div className="text-center">Mode</div><div className="text-center">Result</div><div className="text-center">Amount</div><div className="text-right pr-2">Time</div>
+                        </div>
+                        <div className="flex flex-col divide-y divide-white/[0.02]">
+                          {gameHistory.length === 0 ? (
+                            <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
+                              <p className="text-[13px] text-[#9aa3a8]">No game rounds yet. Start Auto Upgrader, Battle, or Mines to see history here.</p>
+                            </div>
+                          ) : gameHistory.map((item, i) => (
+                            <div key={i} className="grid grid-cols-5 items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02]">
+                              <span className="truncate text-[14px] font-bold italic text-white">{item.account}</span>
+                              <span className="text-center text-[13px] font-bold text-[#7974FF]">{item.mode}</span>
+                              <span className="text-center">
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase ${item.success ? 'bg-[#acff46]/10 text-[#acff46]' : 'bg-red-500/10 text-red-400'}`}>{item.success ? 'Success' : 'Loss'}</span>
+                              </span>
+                              <span className="text-center text-[13px] font-bold text-[#c2c6db]">{item.amount} BUX</span>
+                              <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{item.time}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -1001,178 +702,200 @@ function RollbuxDashboard({ user, onLogout }) {
               </div>
             </div>
           </div>
+        )}
 
-        </div>
-      </div>}
-      {/* Tab: Automations */}
-      {sideTab === 'automations' && (
-        <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8 pt-[35px] pb-[40px]">
-          <div className="flex w-full flex-col items-start gap-[28px]">
-            <div className="flex w-full flex-col items-center justify-center">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    Log Out
-                  </button>
-                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">Automations</h1>
-                </div>
+        {/* ════ AUTOMATIONS TAB ════ */}
+        {sideTab === 'automations' && (
+          <div className="flex w-full justify-center pb-[40px] pt-[35px]">
+            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+              <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  Log Out
+                </button>
+                <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Automations</h1>
               </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
-              {/* Auto Upgrader */}
-              <div className="flex w-full flex-col items-start gap-[12px]">
-                <div className="flex w-full shrink-0 items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Upgrader</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${upgraderActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{upgraderActive ? 'Active' : 'Disabled'}</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input type="checkbox" checked={upgraderActive} onChange={e => setUpgraderActive(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                  </label>
-                </div>
-                <div className="relative flex w-full flex-col items-center justify-center gap-4 overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
-                  <div className="relative z-10 flex flex-col gap-1.5 w-full">
-                    <div className="flex items-center justify-between text-[11px] font-black tracking-tight text-[#9aa3a8]">
-                      <span>MULTIPLIER TARGET</span>
-                      <span className="text-white font-black">{upgraderMultiplier.toFixed(2)}x</span>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
+
+                {/* Auto Upgrader */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[20px] font-black italic text-white">Auto Upgrader</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${upgraderActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{upgraderActive ? 'Active' : 'Disabled'}</span>
                     </div>
-                    <div className="relative flex items-center">
-                      <input type="number" min="1.1" max="100" step="0.05" value={upgraderMultiplier} onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)} className="w-full bg-[#131a29] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-black tracking-tight focus:border-[#8b5cf6] outline-none" />
-                      <span className="absolute right-3 text-xs text-gray-400 font-black">x</span>
-                    </div>
-                  </div>
-                  <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                    <span className="text-xs font-black tracking-tight text-white">Auto Random</span>
                     <label className="relative inline-flex items-center cursor-pointer select-none">
-                      <input type="checkbox" checked={upgraderRandom} onChange={e => setUpgraderRandom(e.target.checked)} className="sr-only peer" />
-                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                      <input type="checkbox" checked={upgraderActive} onChange={e => setUpgraderActive(e.target.checked)} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
                     </label>
                   </div>
-                  <div className="relative z-10 flex items-center gap-2 w-full">
-                    <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
-                    <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Play</button>
+                  <div className="flex flex-col gap-4 rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
+                    {/* Wheel */}
+                    <div className="flex flex-col items-center py-2">
+                      <div className="relative size-[200px] flex items-center justify-center">
+                        <svg className="size-full overflow-visible" viewBox="0 0 200 200">
+                          <circle cx="100" cy="100" r="78" fill="#0c0f17" stroke="#181d2a" strokeWidth="15" />
+                          <circle cx="100" cy="100" r="78" fill="none" stroke="#8b5cf6" strokeWidth="15" strokeDasharray="220.5 490.09" transform="rotate(-90 100 100)" />
+                          <circle cx="100" cy="22" r="6.5" fill="#ffffff" stroke="#8b5cf6" strokeWidth="2" />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                          <span className="text-[34px] font-black text-white tracking-tight leading-none">45.00%</span>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Multiplier */}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-black text-[#9aa3a8]">
+                        <span>MULTIPLIER TARGET</span>
+                        <span className="text-white">{upgraderMultiplier.toFixed(2)}x</span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input type="number" min="1.1" max="100" step="0.05" value={upgraderMultiplier} onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)} className="w-full bg-[#131a29] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-black focus:border-[#8b5cf6] outline-none" />
+                        <span className="absolute right-3 text-xs text-gray-400">x</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-xs font-black text-white">Auto Random</span>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" checked={upgraderRandom} onChange={e => setUpgraderRandom(e.target.checked)} className="sr-only peer" />
+                        <div className="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-xs font-black text-white">Auto Sell</span>
+                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                        <input type="checkbox" checked={upgraderAutoSell} onChange={e => setUpgraderAutoSell(e.target.checked)} className="sr-only peer" />
+                        <div className="w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">All Accounts</button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
+                      <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black rounded-lg transition active:scale-95 cursor-pointer">Play</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* Auto Battle */}
-              <div className="flex w-full flex-col items-start gap-[12px]">
-                <div className="flex w-full shrink-0 items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Auto Battle</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${battleActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{battleActive ? 'Active' : 'Disabled'}</span>
+
+                {/* Auto Battle */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[20px] font-bold italic text-white">Auto Battle</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${battleActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{battleActive ? 'Active' : 'Disabled'}</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input type="checkbox" checked={battleActive} onChange={e => setBattleActive(e.target.checked)} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                    </label>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input type="checkbox" checked={battleActive} onChange={e => setBattleActive(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                  </label>
-                </div>
-                <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
-                  <div className="relative z-10 w-full">
-                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                  <div className="flex flex-col gap-3 rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
+                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] cursor-pointer select-none">
                       <span className="font-semibold text-xs text-white">Borrow Tokens</span>
                       <input type="checkbox" checked={battleBorrow} onChange={e => setBattleBorrow(e.target.checked)} className="sr-only peer" />
-                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                      <div className="relative w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
                     </label>
-                  </div>
-                  <div className="relative z-10 w-full">
-                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] cursor-pointer select-none">
                       <span className="font-semibold text-xs text-white">50/50 Crazy Mode</span>
                       <input type="checkbox" checked={battleCrazy} onChange={e => setBattleCrazy(e.target.checked)} className="sr-only peer" />
-                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                      <div className="relative w-9 h-5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                    </label>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Modifiers</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-[11px] font-extrabold text-yellow-400">JACKPOT</span>
+                        <span className="px-2 py-0.5 rounded bg-[#acff46]/10 border border-[#acff46]/20 text-[11px] font-extrabold text-[#acff46]">3v3</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">2 Accs</button>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
+                      <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 cursor-pointer">Create</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auto Mines */}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[20px] font-black italic text-white">Auto Mines</p>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${minesActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{minesActive ? 'Active' : 'Disabled'}</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input type="checkbox" checked={minesActive} onChange={e => setMinesActive(e.target.checked)} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
                     </label>
                   </div>
-                  <div className="relative z-10 flex items-center gap-2 w-full pt-1">
-                    <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
-                    <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Create</button>
+                  <div className="flex flex-col gap-3 rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5">
+                      <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                      <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">All Accounts</button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
+                      <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black rounded-lg transition active:scale-95 cursor-pointer">Play</button>
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* Auto Mines */}
-              <div className="flex w-full flex-col items-start gap-[12px]">
-                <div className="flex w-full shrink-0 items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Mines</p>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${minesActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{minesActive ? 'Active' : 'Disabled'}</span>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input type="checkbox" checked={minesActive} onChange={e => setMinesActive(e.target.checked)} className="sr-only peer" />
-                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
-                  </label>
-                </div>
-                <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
-                  <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
-                    <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
-                    <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black"><span>All Accounts</span></button>
-                  </div>
-                  <div className="relative z-10 flex items-center gap-2 w-full">
-                    <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
-                    <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Play</button>
-                  </div>
-                </div>
+
               </div>
             </div>
           </div>
-        </div>
-      )}
-      {/* Tab: Rains */}
-      {sideTab === 'rains' && (
-        <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8 pt-[35px] pb-[40px]">
-          <div className="flex w-full flex-col items-start gap-[28px]">
-            <div className="flex w-full flex-col items-center justify-center">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex shrink-0 flex-col items-start gap-[6px]">
-                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                    Log Out
-                  </button>
-                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
-                </div>
+        )}
+
+        {/* ════ RAINS TAB ════ */}
+        {sideTab === 'rains' && (
+          <div className="flex w-full justify-center pb-[40px] pt-[35px]">
+            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+              <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 cursor-pointer">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                  Log Out
+                </button>
+                <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
               </div>
-            </div>
-            <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
-              <div className="flex w-full shrink-0 items-center justify-between">
-                <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Active Rains</p>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer"><span>Clear Rains</span></button>
-                  <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
+              <div className="flex w-full flex-col gap-[16px]">
+                <div className="flex w-full items-center justify-between">
+                  <p className="text-[20px] font-bold italic text-white">Active Rains</p>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="flex h-[30px] items-center justify-center rounded-[7px] px-[12px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition cursor-pointer">Clear Rains</button>
+                    <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
-                <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
-                  <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
-                    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
-                      <div>Account</div>
-                      <div className="text-center">Time Left</div>
-                      <div className="text-center">Amount</div>
-                      <div className="text-right pr-2">Time</div>
-                      <div className="text-center"></div>
+                <div className="custom-scroll w-full overflow-x-auto overflow-y-hidden">
+                  <div className="relative w-full min-w-[650px] rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold text-[#9aa3a8] border-b border-white/[0.04]">
+                      <div>Account</div><div className="text-center">Time Left</div><div className="text-center">Amount</div><div className="text-right pr-2">Status</div><div />
                     </div>
                     <div className="flex flex-col divide-y divide-white/[0.02]">
                       {rains.length === 0 ? (
                         <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
-                          <p className="text-[13px] leading-[20px] text-[#9aa3a8]">No active rains. The rain bot will auto-join when a cycle is detected.</p>
+                          <p className="text-[13px] text-[#9aa3a8]">No active rains. The rain bot will auto-join when a cycle is detected.</p>
                         </div>
-                      ) : (
-                        rains.map((rain, i) => (
-                          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
-                            <span className="truncate text-[15px] font-bold italic tracking-[0.3px] text-[#acff46]">{user.username}</span>
-                            <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
-                            <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
-                            <span className="text-right pr-2"><span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">Active Cycle</span></span>
-                          </div>
-                        ))
-                      )}
+                      ) : rains.map((rain, i) => (
+                        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
+                          <span className="truncate text-[15px] font-bold italic text-[#acff46]">{user.username}</span>
+                          <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
+                          <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
+                          <span className="text-right pr-2"><span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">Active Cycle</span></span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-      </div> {/* End main content area */}
+        )}
+
+      </div>
     </div>
   )
 }
