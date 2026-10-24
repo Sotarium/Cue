@@ -48,6 +48,6 @@
       "splashImage": null,
       "useZip": false
     },
-    "compression": "store"
+    "compression": "maximum"
   }
 }
