@@ -160,36 +160,34 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
 
 function UpdateDetectedScreen({ onComplete }) {
   const [updating, setUpdating] = useState(false)
-  const [currentStepIndex, setCurrentStepIndex] = useState(-1)
+  const [currentFile, setCurrentFile] = useState('Updating index.html...')
 
-  const updatePackages = [
-    { name: 'Updating index.html…', target: 'index.html' },
-    { name: 'Updating homepage.jsx…', target: 'homepage.jsx' },
-    { name: 'Updating styles.css…', target: 'styles.css' },
-    { name: 'Updating rollbux_upgrader_engine.js…', target: 'upgrader_engine.js' },
-    { name: 'Updating game_audio_pack.bundle…', target: 'audio_pack.bundle' },
-    { name: 'Verifying hash signatures and hot-patching runtime…', target: 'checksum' }
+  const filesToUpdate = [
+    'Updating index.html...',
+    'Updating homepage.jsx...',
+    'Updating styles.css...',
+    'Updating rollbux_upgrader_engine.js...',
+    'Updating game_audio_pack.bundle...',
+    'Verifying checksums and hot-patching runtime...'
   ]
 
   const handleStartUpdate = () => {
     setUpdating(true)
     let idx = 0
+    setCurrentFile(filesToUpdate[0])
 
     const interval = setInterval(() => {
-      setCurrentStepIndex(idx)
       idx++
-      if (idx > updatePackages.length) {
+      if (idx < filesToUpdate.length) {
+        setCurrentFile(filesToUpdate[idx])
+      } else {
         clearInterval(interval)
         setTimeout(() => {
           onComplete()
-        }, 800)
+        }, 600)
       }
-    }, 1100)
+    }, 700)
   }
-
-  const progressPercent = currentStepIndex >= 0 
-    ? Math.min(100, Math.round(((currentStepIndex + 1) / updatePackages.length) * 100))
-    : 0
 
   return (
     <div className="update-fullscreen-overlay">
@@ -214,33 +212,12 @@ function UpdateDetectedScreen({ onComplete }) {
             Update
           </button>
         ) : (
-          <div className="update-log-terminal">
-            {updatePackages.map((pkg, i) => {
-              let statusText = 'Pending'
-              let statusClass = 'pending'
-
-              if (i < currentStepIndex) {
-                statusText = 'Done'
-                statusClass = 'done'
-              } else if (i === currentStepIndex) {
-                statusText = 'Updating…'
-                statusClass = 'active'
-              }
-
-              return (
-                <div key={pkg.target} className="update-log-item">
-                  <span className="update-log-name">{pkg.name}</span>
-                  <span className={`update-log-status ${statusClass}`}>{statusText}</span>
-                </div>
-              )
-            })}
-
-            <div className="update-progress-bar-bg">
-              <div className="update-progress-bar-fill" style={{ width: `${progressPercent}%` }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#888', marginTop: 2 }}>
-              <span>Patching local client…</span>
-              <span style={{ color: '#acff46', fontWeight: 700 }}>{progressPercent}%</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', marginTop: 12 }}>
+            <span style={{ fontFamily: 'monospace', fontSize: 13, color: '#acff46', fontWeight: 700 }}>
+              {currentFile}
+            </span>
+            <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 9999, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: '100%', background: '#acff46' }} />
             </div>
           </div>
         )}
@@ -248,10 +225,6 @@ function UpdateDetectedScreen({ onComplete }) {
     </div>
   )
 }
-
-// ============================================================================
-// Rollbux Dashboard — Authentic Original Dashboard Layout
-// ============================================================================
 
 function RollbuxDashboard({ user, onLogout }) {
   const [currentUnit, setCurrentUnit] = useState('BUX')
@@ -442,8 +415,8 @@ function RollbuxDashboard({ user, onLogout }) {
 
       {toast && <div className="toast-notice">{toast}</div>}
 
-      {/* Fullscreen Blocking View for Update Detected */}
-      {showUpdateScreen && (
+      
+      {false && (
         <UpdateDetectedScreen
           onComplete={() => {
             setShowUpdateScreen(false)
@@ -985,6 +958,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
+  const [hasUpdated, setHasUpdated] = useState(false)
   const [currentUser, setCurrentUser] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
 
@@ -1021,6 +995,16 @@ function DesktopApp() {
     window.localStorage.removeItem('sotarium_session_token')
     window.localStorage.removeItem('sotarium_user_profile')
     setCurrentUser(null)
+  }
+
+  if (!hasUpdated) {
+    return (
+      <UpdateDetectedScreen
+        onComplete={() => {
+          setHasUpdated(true)
+        }}
+      />
+    )
   }
 
   if (loadingInitial) {
