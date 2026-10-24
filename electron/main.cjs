@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const https = require('https')
 
@@ -9,73 +9,95 @@ if (!gotTheLock) {
   process.exit(0)
 }
 
-function verifyRollbuxSession(token) {
+function makeRollbuxRequest({ path: apiPath, method = 'GET', body = null, token = '' }) {
   return new Promise((resolve) => {
-    if (!token || typeof token !== 'string' || token.trim().length < 5) {
-      return resolve({ success: false, error: 'Enter a valid authjs.session-token.' })
+    const trimmed = (token || '').trim()
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/plain, */*',
+      'Origin': 'https://rollbux.com',
+      'Referer': 'https://rollbux.com/',
     }
 
-    const trimmed = token.trim()
+    if (trimmed) {
+      headers['Cookie'] = `authjs.session-token=${trimmed}`
+      headers['Authorization'] = `Bearer ${trimmed}`
+    }
+
+    let payloadString = ''
+    if (body) {
+      payloadString = typeof body === 'string' ? body : JSON.stringify(body)
+      headers['Content-Type'] = 'application/json'
+      headers['Content-Length'] = Buffer.byteLength(payloadString)
+    }
+
     const options = {
       hostname: 'rollbux.com',
       port: 443,
-      path: '/_api/users/me',
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Origin': 'https://rollbux.com',
-        'Referer': 'https://rollbux.com/',
-        'Cookie': `authjs.session-token=${trimmed}`,
-        'Authorization': `Bearer ${trimmed}`
-      }
+      path: apiPath.startsWith('/') ? apiPath : `/${apiPath}`,
+      method: method.toUpperCase(),
+      headers
     }
 
     const req = https.request(options, (res) => {
       let rawData = ''
       res.on('data', (chunk) => { rawData += chunk })
       res.on('end', () => {
-        try {
-          const parsed = JSON.parse(rawData)
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            const user = parsed.data?.user || parsed.data || parsed.user || parsed
-            resolve({
-              success: true,
-              user: {
-                username: user.username || user.name || 'Player',
-                level: user.level !== undefined ? user.level : (user.tier || 1),
-                token_balance: user.token_balance || 0,
-                avatar: user.avatar_url || user.avatar || null,
-                raw: user
-              }
-            })
-          } else {
-            resolve({
-              success: false,
-              statusCode: res.statusCode,
-              error: parsed.message || parsed.error || `Authentication failed (${res.statusCode})`
-            })
-          }
-        } catch (err) {
-          if (res.statusCode === 401) {
-            resolve({ success: false, error: 'Authentication required: Invalid session token' })
-          } else {
-            resolve({ success: false, error: `Invalid response from server (${res.statusCode})` })
-          }
-        }
+        let json = null
+        try { json = JSON.parse(rawData) } catch (e) {}
+        resolve({
+          statusCode: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          data: json,
+          text: rawData
+        })
       })
     })
 
     req.on('error', (e) => {
-      resolve({ success: false, error: `Connection failed: ${e.message}` })
+      resolve({ statusCode: 500, ok: false, error: e.message })
     })
 
-    req.setTimeout(12000, () => {
+    req.setTimeout(15000, () => {
       req.destroy()
-      resolve({ success: false, error: 'Request timed out connecting to rollbux.com' })
+      resolve({ statusCode: 408, ok: false, error: 'Request timeout' })
     })
 
+    if (payloadString) {
+      req.write(payloadString)
+    }
     req.end()
+  })
+}
+
+function verifyRollbuxSession(token) {
+  return new Promise((resolve) => {
+    if (!token || typeof token !== 'string' || token.trim().length < 5) {
+      return resolve({ success: false, error: 'Enter a valid authjs.session-token.' })
+    }
+
+    makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token }).then((res) => {
+      if (res.ok && res.data) {
+        const user = res.data.data?.user || res.data.data || res.data.user || res.data
+        resolve({
+          success: true,
+          user: {
+            username: user.username || user.name || 'Player',
+            level: user.level !== undefined ? user.level : (user.tier || 1),
+            token_balance: user.token_balance || 0,
+            avatar: user.avatar_url || user.avatar || null,
+            raw: user
+          }
+        })
+      } else {
+        const err = res.data?.message || res.data?.error || `Authentication failed (${res.statusCode})`
+        resolve({
+          success: false,
+          statusCode: res.statusCode,
+          error: res.statusCode === 401 ? 'Authentication required: Invalid session token' : err
+        })
+      }
+    })
   })
 }
 
@@ -87,10 +109,17 @@ function createWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 720,
-    backgroundColor: '#121418',
-    show: false, // Don't show until rendered to avoid flashes
+    backgroundColor: '#242424',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#1a1a1a',
+      symbolColor: '#ffffff',
+      height: 32
+    },
+    show: false,
     autoHideMenuBar: true,
     title: 'Sotarium',
+    icon: path.join(__dirname, '..', 'build', 'sotarium-icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -99,7 +128,6 @@ function createWindow() {
     },
   })
 
-  // Show only when ready to avoid flashing or opening/closing appearances
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
   })
@@ -110,10 +138,6 @@ function createWindow() {
       console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
       app.quit()
     }
-  })
-
-  mainWindow.webContents.once('did-fail-load', (_event, errorCode, errorDescription) => {
-    if (process.env.SOTARIUM_SMOKE === '1') console.error(`SOTARIUM_SMOKE_FAIL ${errorCode} ${errorDescription}`)
   })
 
   mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
@@ -129,6 +153,10 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   ipcMain.handle('verify-session', async (_event, token) => {
     return await verifyRollbuxSession(token)
+  })
+
+  ipcMain.handle('rollbux-request', async (_event, options) => {
+    return await makeRollbuxRequest(options)
   })
 
   createWindow()
