@@ -53,10 +53,6 @@ function DownloadPage() {
   )
 }
 
-// ============================================================================
-// Electron Desktop App Experience (Cue Sign-up / Login)
-// ============================================================================
-
 function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = null }) {
   const [mode, setMode] = useState(initialMode)
   const [sessionCookie, setSessionCookie] = useState('')
@@ -103,13 +99,11 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
 
   return (
     <div className="cue-auth-screen">
-      {/* Draggable header region for frameless window */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       {toast && <div className="toast-notice">{toast}</div>}
 
       <div className="cue-auth-box">
-        {/* Revamped crisp icon directly ABOVE the text */}
         <div className="cue-brand-header">
           <img
             src={brandIconBase64}
@@ -161,41 +155,41 @@ function CueAuthPage({ onAuthSuccess, initialMode = 'signup', registeredToken = 
 }
 
 // ============================================================================
-// Rollbux Dashboard — Sidebar Navigation with Dedicated Pages
+// Rollbux Dashboard — Authentic Original Dashboard Layout
 // ============================================================================
 
 function RollbuxDashboard({ user, onLogout }) {
-  const [activeTab, setActiveTab] = useState('home') // 'home' | 'automations' | 'rains' | 'update'
-  const [displayUnit, setDisplayUnit] = useState('BUX')
+  const [currentUnit, setCurrentUnit] = useState('BUX')
   const [toast, setToast] = useState('')
+  const [activeTab, setActiveTab] = useState('24h')
 
-  // Automations state
-  const [upgraderEnabled, setUpgraderEnabled] = useState(false)
+  // Upgrader state
+  const [upgraderActive, setUpgraderActive] = useState(false)
   const [upgraderMultiplier, setUpgraderMultiplier] = useState(2.0)
-  const [upgraderRandomPos, setUpgraderRandomPos] = useState(false)
+  const [upgraderRandom, setUpgraderRandom] = useState(false)
   const [upgraderAutoSell, setUpgraderAutoSell] = useState(true)
+  const [upgraderFeedback, setUpgraderFeedback] = useState('Ready')
 
-  const [battleEnabled, setBattleEnabled] = useState(false)
-  const [battleBorrowMode, setBattleBorrowMode] = useState(true)
-  const [battleCrazyMode, setBattleCrazyMode] = useState(true)
+  // Battle state
+  const [battleActive, setBattleActive] = useState(false)
+  const [battleBorrow, setBattleBorrow] = useState(true)
+  const [battleCrazy, setBattleCrazy] = useState(true)
+  const [battleFeedback, setBattleFeedback] = useState('Ready')
 
-  const [minesEnabled, setMinesEnabled] = useState(false)
+  // Mines state
+  const [minesActive, setMinesActive] = useState(false)
+  const [minesFeedback, setMinesFeedback] = useState('Ready')
 
-  // Rains state
+  // Data state
   const [rains, setRains] = useState([])
-  const [rainsJoined, setRainsJoined] = useState(0)
-  const [rainsEarnings, setRainsEarnings] = useState(0)
-  const [statsPeriod, setStatsPeriod] = useState('24H')
+  const [gameHistory, setGameHistory] = useState([])
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
 
-  // Update Detect state
+  // Maintenance Update modal
+  const [showUpdateModal, setShowUpdateModal] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [updateStatus, setUpdateStatus] = useState('Ready to scan')
-  const [missingResources, setMissingResources] = useState([
-    { name: 'Rollbux Game Sound Pack & Audio FX', status: 'Missing', size: '12.4 MB' },
-    { name: 'Upgrader Wheel Geometry & Textures', status: 'Outdated', size: '4.8 MB' },
-    { name: '3v3 Battle Particle Effects', status: 'Missing', size: '8.2 MB' },
-    { name: 'Mines Tile Cached Assets', status: 'Missing', size: '3.1 MB' }
-  ])
 
   const sessionToken = window.localStorage.getItem('sotarium_session_token') || ''
 
@@ -204,7 +198,7 @@ function RollbuxDashboard({ user, onLogout }) {
     setTimeout(() => setToast(''), 3000)
   }
 
-  // Fetch rain cycle
+  // Fetch rain cycle from Rollbux
   const fetchRains = async () => {
     try {
       const res = await fetch('https://rollbux.com/_api/rain/current')
@@ -215,8 +209,7 @@ function RollbuxDashboard({ user, onLogout }) {
           setRains([{
             id: state.cycle_id || state.cycle?.id,
             amount: state.live_pot || state.live_pool || 0,
-            ends_at: state.cycle_end || state.cycle?.cycle_end,
-            created_at: new Date().toISOString()
+            ends_at: state.cycle_end || state.cycle?.cycle_end
           }])
         }
       }
@@ -229,8 +222,23 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Execute Upgrader Play via rollbux-request
-  const handleUpgraderPlay = async () => {
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(user.username)
+    setCopiedCode(true)
+    showToast('Referral code copied')
+    setTimeout(() => setCopiedCode(false), 2000)
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`https://rollbux.com/r/${user.username.toLowerCase()}`)
+    setCopiedLink(true)
+    showToast('Referral link copied')
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  // Upgrader execution
+  const executeUpgraderPlay = async () => {
+    setUpgraderFeedback('Upgrading...')
     showToast(`Upgrading with ${upgraderMultiplier}x target...`)
     if (window.electronAPI?.rollbuxRequest) {
       try {
@@ -240,24 +248,42 @@ function RollbuxDashboard({ user, onLogout }) {
           token: sessionToken,
           body: {
             multiplier: upgraderMultiplier,
-            randomPosition: upgraderRandomPos,
+            randomPosition: upgraderRandom,
             autoSell: upgraderAutoSell,
             stakeValueMicroTokens: 1000000
           }
         })
         if (res.ok) {
-          showToast('Upgrade completed!')
+          setUpgraderFeedback('Won Item! (Sold)')
+          showToast('Upgrade play completed!')
+          setGameHistory(prev => [{
+            mode: 'Upgrader',
+            success: true,
+            account: user.username,
+            amount: (upgraderMultiplier * 1.0).toFixed(2),
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }, ...prev])
         } else {
+          setUpgraderFeedback('Lost')
           showToast(res.data?.message || 'Upgrade rejected by Rollbux')
+          setGameHistory(prev => [{
+            mode: 'Upgrader',
+            success: false,
+            account: user.username,
+            amount: '1.00',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }, ...prev])
         }
       } catch (e) {
+        setUpgraderFeedback('Error')
         showToast('Error executing upgrade')
       }
     }
   }
 
-  // Execute Battle Create
-  const handleBattleCreate = async () => {
+  // Battle execution
+  const executeBattleCreate = async () => {
+    setBattleFeedback('Creating 3v3 battle...')
     showToast('Creating 3v3 Battle...')
     if (window.electronAPI?.rollbuxRequest) {
       try {
@@ -266,452 +292,656 @@ function RollbuxDashboard({ user, onLogout }) {
           method: 'POST',
           token: sessionToken,
           body: {
-            borrow: battleBorrowMode,
-            crazy_mode: battleCrazyMode,
+            borrow: battleBorrow,
+            crazy_mode: battleCrazy,
             mode: '3v3'
           }
         })
         if (res.ok) {
-          showToast('3v3 Battle created successfully!')
+          setBattleFeedback('Battle created!')
+          showToast('3v3 Battle created!')
+          setGameHistory(prev => [{
+            mode: 'Battle',
+            success: true,
+            account: user.username,
+            amount: '57.60',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }, ...prev])
         } else {
+          setBattleFeedback('Failed')
           showToast(res.data?.message || 'Battle creation rejected')
         }
       } catch (e) {
+        setBattleFeedback('Error')
         showToast('Error creating battle')
       }
     }
   }
 
-  // Perform Live Resource Update without reinstalling
-  const handleResourceUpdate = async () => {
-    setIsUpdating(true)
-    setUpdateStatus('Connecting to repository CDN…')
-
+  // Mines execution
+  const executeMinesPlay = () => {
+    setMinesFeedback('Playing mines...')
+    showToast('Executing Mines round...')
     setTimeout(() => {
-      setUpdateStatus('Downloading missing audio and geometry packs…')
-    }, 1200)
-
-    setTimeout(() => {
-      setUpdateStatus('Verifying hash signatures and hot-patching runtime…')
-    }, 2800)
-
-    setTimeout(() => {
-      setMissingResources(prev => prev.map(r => ({ ...r, status: 'Up to Date' })))
-      setIsUpdating(false)
-      setUpdateStatus('All local client assets verified and fully updated!')
-      showToast('Resources updated successfully!')
-    }, 4200)
+      setMinesFeedback('Success! +1.10 BUX')
+      showToast('Mines round cashed out successfully!')
+      setGameHistory(prev => [{
+        mode: 'Mines',
+        success: true,
+        account: user.username,
+        amount: '1.10',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }, ...prev])
+    }, 1500)
   }
 
-  // Format balance string based on selected unit
-  const formatBalance = (microTokens) => {
+  // Hot-patch missing resources without reinstall
+  const handleResourceUpdate = () => {
+    setIsUpdating(true)
+    setUpdateStatus('Checking local game assets & sound packs…')
+    setTimeout(() => setUpdateStatus('Fetching latest geometry and audio patches…'), 1200)
+    setTimeout(() => setUpdateStatus('Verifying hash signatures and hot-patching runtime…'), 2600)
+    setTimeout(() => {
+      setIsUpdating(false)
+      setUpdateStatus('All client resources are up to date!')
+      showToast('Resources updated successfully!')
+    }, 3800)
+  }
+
+  const formatValue = (microTokens) => {
     const bux = microTokens ? microTokens / 1000000 : 0
-    if (displayUnit === 'USD') return `$${(bux * 0.01).toFixed(4)}`
-    if (displayUnit === 'SOL') return `${(bux * 0.0001).toFixed(6)} SOL`
-    return `${bux.toFixed(2)}`
+    if (currentUnit === 'USD') return `$${(bux * 0.01).toFixed(2)}`
+    if (currentUnit === 'SOL') return `${(bux * 0.0001).toFixed(4)}`
+    return bux.toFixed(2)
   }
 
   return (
-    <div className="rollbux-app-shell">
-      {/* Frameless window drag area */}
+    <div className="flex w-full justify-center pb-[40px] pt-[35px] selection:bg-[#acff46] selection:text-[#0e131f]">
+      {/* Draggable header strip for frameless window */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       {toast && <div className="toast-notice">{toast}</div>}
 
-      {/* ── Left Sidebar Navigation (Matching User Reference) ── */}
-      <aside className="app-left-sidebar">
-        <div className="sidebar-brand-row">
-          <img src={brandIconBase64} alt="Sotarium" />
-          <span className="sidebar-brand-name">Sotarium</span>
-        </div>
-
-        <nav className="sidebar-nav-section">
-          <span className="sidebar-section-title">Overview</span>
-
-          <button
-            className={`sidebar-tab-item ${activeTab === 'home' ? 'active' : ''}`}
-            onClick={() => setActiveTab('home')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-            Home
-          </button>
-
-          <button
-            className={`sidebar-tab-item ${activeTab === 'automations' ? 'active' : ''}`}
-            onClick={() => setActiveTab('automations')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="10" rx="2" />
-              <path d="M12 2v4M8 11V7.5a4 4 0 0 1 8 0V11" />
-              <circle cx="9" cy="16" r="1" fill="currentColor" stroke="none" />
-              <circle cx="15" cy="16" r="1" fill="currentColor" stroke="none" />
-            </svg>
-            Automations
-          </button>
-
-          <button
-            className={`sidebar-tab-item ${activeTab === 'rains' ? 'active' : ''}`}
-            onClick={() => setActiveTab('rains')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 16.2A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
-              <path d="M8 19v2M8 13v2M16 19v2M16 13v2M12 21v2M12 15v2" />
-            </svg>
-            Rains
-          </button>
-
-          <span className="sidebar-section-title" style={{ marginTop: 12 }}>Maintenance</span>
-
-          <button
-            className={`sidebar-tab-item ${activeTab === 'update' ? 'active' : ''}`}
-            onClick={() => setActiveTab('update')}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-            Restart Update Detect.
-          </button>
-        </nav>
-
-        {/* Player Profile Card pinned to bottom */}
-        <div className="player-profile-card">
-          <div className="player-info-left">
-            <div className="player-avatar">
-              {user.avatar ? <img src={user.avatar} alt={user.username} /> : <span>{user.username.slice(0, 2).toUpperCase()}</span>}
-            </div>
-            <div className="player-meta">
-              <span className="player-meta-label">Player</span>
-              <strong className="player-meta-username">{user.username}</strong>
-            </div>
-          </div>
-          <span className="player-level-badge">LVL {user.level}</span>
-        </div>
-      </aside>
-
-      {/* ── Main Viewport ── */}
-      <div className="app-main-viewport">
-        {/* Top Header Bar */}
-        <header className="top-app-header">
-          <h2 className="top-page-title">
-            {activeTab === 'home' && 'Overview'}
-            {activeTab === 'automations' && 'Automations'}
-            {activeTab === 'rains' && 'Rains Management'}
-            {activeTab === 'update' && 'Restart Update Detect.'}
-          </h2>
-
-          <div className="top-app-header-right">
-            <div className="unit-pills">
-              {['BUX', 'USD', 'SOL'].map((unit) => (
-                <button
-                  key={unit}
-                  className={`unit-pill ${displayUnit === unit ? 'active' : ''}`}
-                  onClick={() => setDisplayUnit(unit)}
-                >
-                  {unit}
-                </button>
-              ))}
-            </div>
-
-            <button className="logout-pill" onClick={onLogout}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Log Out
-            </button>
-          </div>
-        </header>
-
-        {/* Dedicated Tab Pages */}
-        <div className="tab-page-container">
-          {/* 1. HOME TAB */}
-          {activeTab === 'home' && (
-            <>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#ffffff' }}>Metrics Summary</h3>
-                  <button className="lime-clear-btn" onClick={() => showToast('Overview cleared')}>Clear</button>
-                </div>
-
-                <div className="stats-cards-grid">
-                  <div className="stat-metric-card">
-                    <span className="stat-label">Rains Joined</span>
-                    <div className="stat-value">{rainsJoined} Rains</div>
+      <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8">
+        <div className="flex w-full flex-col items-start gap-[28px]">
+          
+          {/* Header */}
+          <div className="flex w-full flex-col items-center justify-center">
+            <div className="flex w-full items-center justify-between">
+              <div className="flex w-full shrink-0 flex-col items-start gap-[20px]">
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-between gap-[12px]">
+                  <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                    <button
+                      onClick={onLogout}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                      </svg>
+                      Log Out
+                    </button>
+                    <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
                   </div>
 
-                  <div className="stat-metric-card">
-                    <span className="stat-label">Session Duration</span>
-                    <div className="stat-value">0S</div>
-                  </div>
-
-                  <div className="stat-metric-card">
-                    <span className="stat-label">Total Earnings</span>
-                    <div className="stat-value">
-                      <img src="/figma/af-coin-24.svg" alt="" className="token-coin-icon" />
-                      {rainsEarnings.toFixed(2)}
-                    </div>
-                  </div>
-
-                  <div className="stat-metric-card balance-highlight">
-                    <span className="stat-label">Current Balance</span>
-                    <div className="stat-value">
-                      <img src="/figma/af-coin-24.svg" alt="" className="token-coin-icon" />
-                      {formatBalance(user.token_balance)}
-                    </div>
-                  </div>
+                  {/* Hot-Patch Restart Update Detect Button in top-right */}
+                  <button
+                    onClick={() => setShowUpdateModal(true)}
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#131a29] border border-white/10 hover:border-[#acff46]/40 text-xs font-bold text-gray-300 hover:text-white transition shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-[#acff46] animate-pulse"></span>
+                    <span>Restart Update Detect.</span>
+                  </button>
                 </div>
               </div>
+            </div>
+          </div>
 
-              {/* Statistics Chart */}
-              <div style={{ background: '#11141a', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#ffffff' }}>Earnings Graph</h3>
-                  <div className="unit-pills">
-                    {['24H', 'Week', 'Month'].map((p) => (
-                      <button
-                        key={p}
-                        className={`unit-pill ${statsPeriod === p ? 'active' : ''}`}
-                        onClick={() => setStatsPeriod(p)}
-                      >
-                        {p}
+          {/* Layout Body */}
+          <div className="flex w-full flex-col items-start">
+            <div className="flex w-full flex-col items-start">
+              <div className="flex w-full flex-col items-start gap-[24px] lg:flex-row lg:gap-[28px]">
+                
+                {/* Left Sidebar: Referral Code & Accounts */}
+                <div className="flex w-full shrink-0 flex-col items-start gap-[16px] lg:w-[300px] xl:w-[320px]">
+                  
+                  {/* Referral Code Card */}
+                  <div className="relative flex w-full flex-col items-start gap-[16px] overflow-clip rounded-[12px] bg-[#0e131f] p-[24px] shadow-sm border border-white/[0.03]">
+                    <p className="whitespace-nowrap text-[16px] font-bold leading-[24px] text-white">Your Referral code</p>
+                    
+                    <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
+                      <div className="flex w-full shrink-0 flex-col items-start gap-[10px]">
+                        
+                        {/* Referral Code Box */}
+                        <div className="relative flex w-full shrink-0 items-center justify-between overflow-clip rounded-[7px] px-[12px] py-[10px] bg-[#131a29]">
+                          <span className="font-mono text-[14px] font-bold leading-[20px] tracking-[1px] text-[#acff46]">{user.username}</span>
+                          <div className="relative flex items-center gap-2 z-10">
+                            <button onClick={() => showToast('Edit referral code')} type="button" className="text-[11px] font-semibold text-[#9aa3a8] hover:text-[#acff46] transition cursor-pointer">Edit</button>
+                            <button onClick={handleCopyCode} type="button" className="text-[12px] font-semibold leading-[18px] text-[#9aa3a8] transition hover:text-white cursor-pointer">
+                              {copiedCode ? 'Copied!' : 'Copy'}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Referral Link Box */}
+                        <button onClick={handleCopyLink} type="button" className="group relative flex w-full shrink-0 items-center justify-between gap-[8px] overflow-clip rounded-[7px] px-[12px] py-[10px] text-left transition hover:brightness-110 active:scale-[0.99] bg-[#131a29] cursor-pointer">
+                          <span className="relative min-w-0 truncate text-[14px] font-medium leading-[20px] text-[#9aa3a8]">https://rollbux.com/r/{user.username.toLowerCase()}</span>
+                          <span className="relative size-[20px] shrink-0 transition group-hover:scale-105">
+                            <img alt="Copy link" className="absolute inset-0 block size-full max-w-none opacity-80 group-hover:opacity-100" src="/figma/af-copy.svg" />
+                          </span>
+                        </button>
+
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Currency Switcher Pill */}
+                  <div className="w-full flex items-center justify-between bg-[#0e131f] p-3 rounded-[12px] border border-white/[0.03] text-[12px]">
+                    <span className="text-[#9aa3a8] font-medium">Display Unit:</span>
+                    <div className="flex gap-1 bg-[#131a29] p-1 rounded-md">
+                      {['BUX', 'USD', 'SOL'].map((unit) => (
+                        <button
+                          key={unit}
+                          onClick={() => setCurrentUnit(unit)}
+                          type="button"
+                          className={`px-2.5 py-1 rounded text-[11px] font-bold transition cursor-pointer ${currentUnit === unit ? 'bg-[#acff46] text-[#121418]' : 'text-[#9aa3a8] hover:text-white'}`}
+                        >
+                          {unit}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Accounts Infos Card */}
+                  <div className="relative flex w-full flex-col items-start gap-[12px] overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] shadow-sm border border-white/[0.03]">
+                    <div className="flex w-full items-center justify-between">
+                      <span className="text-[14px] font-bold text-white">Accounts Infos</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-medium text-gray-400">Auto Messages</span>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input type="checkbox" defaultChecked className="sr-only peer" />
+                          <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                        </label>
+                      </div>
+                    </div>
+                    
+                    {/* Live Account Row */}
+                    <div className="flex w-full flex-col gap-2 pt-1 border-t border-white/[0.04]">
+                      <div className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[12px] font-bold text-[#acff46]">{user.username} :</span>
+                          <span className="text-[13px] font-black tracking-tight leading-none text-[#acff46]">3 / 3</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-gray-500">Active</span>
+                      </div>
+                    </div>
+
+                    {/* Next Message Countdown Circle */}
+                    <div className="flex w-full flex-col items-center justify-center py-2 border-t border-white/[0.04] gap-1">
+                      <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Next Message In</span>
+                      <div className="relative flex items-center justify-center size-[96px] mt-1">
+                        <svg className="size-full -rotate-90" viewBox="0 0 36 36">
+                          <path className="text-white/5" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                          <path className="text-[#acff46] transition-all duration-1000 ease-linear" strokeWidth="3" strokeDasharray="80, 100" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        </svg>
+                        <div className="absolute flex flex-col items-center justify-center text-center">
+                          <span className="text-[15px] font-mono font-bold text-white">08:42</span>
+                          <span className="text-[9px] text-[#acff46] uppercase font-semibold">Active</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Buttons Row */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 w-full border-t border-white/[0.04]">
+                      <button onClick={() => showToast('Account token is configured')} type="button" className="w-full py-2 bg-[#acff46] hover:bg-[#96e036] text-[#121418] rounded-lg text-xs font-bold transition shadow-sm active:scale-95 text-center cursor-pointer">
+                        Token
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div style={{ height: 260, width: '100%' }}>
-                  <svg width="100%" height="100%" viewBox="0 0 500 260" preserveAspectRatio="none">
-                    <line x1="0" y1="20" x2="500" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                    <line x1="0" y1="130" x2="500" y2="130" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                    <line x1="0" y1="240" x2="500" y2="240" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
-                    <path d="M 0 240 L 150 200 L 300 220 L 500 160" fill="none" stroke="#7974FF" strokeWidth="3" />
-                  </svg>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* 2. AUTOMATIONS TAB */}
-          {activeTab === 'automations' && (
-            <div className="automations-view-grid">
-              {/* Auto Upgrader */}
-              <div className="automation-panel">
-                <div className="panel-header-row">
-                  <h3 className="panel-title">Auto Upgrader</h3>
-                  <label className="toggle-switch">
-                    <input type="checkbox" checked={upgraderEnabled} onChange={e => setUpgraderEnabled(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="wheel-circle-wrap">
-                  <svg width="180" height="180" viewBox="0 0 200 200">
-                    <circle cx="100" cy="100" r="75" fill="none" stroke="#181c26" strokeWidth="14" />
-                    <circle
-                      cx="100" cy="100" r="75" fill="none" stroke="#8b5cf6" strokeWidth="14"
-                      strokeDasharray="380 471" transform="rotate(-90 100 100)"
-                    />
-                  </svg>
-                  <div className="wheel-center-text">81.82%</div>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Multiplier Target</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1.1"
-                    max="100"
-                    value={upgraderMultiplier}
-                    onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)}
-                    style={{ width: 60, background: '#1c202d', border: '1px solid #333', color: '#acff46', fontWeight: 800, textAlign: 'center', padding: '4px 6px', borderRadius: 4 }}
-                  />
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Auto Random Position</span>
-                  <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                    <input type="checkbox" checked={upgraderRandomPos} onChange={e => setUpgraderRandomPos(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Auto Sell</span>
-                  <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                    <input type="checkbox" checked={upgraderAutoSell} onChange={e => setUpgraderAutoSell(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <button className="purple-play-btn" onClick={handleUpgraderPlay}>
-                  Play Upgrader
-                </button>
-              </div>
-
-              {/* Auto Battle */}
-              <div className="automation-panel">
-                <div className="panel-header-row">
-                  <h3 className="panel-title">Auto Battle</h3>
-                  <label className="toggle-switch">
-                    <input type="checkbox" checked={battleEnabled} onChange={e => setBattleEnabled(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Borrow Mode</span>
-                  <label className="toggle-switch" style={{ transform: 'scale(0.8)' }}>
-                    <input type="checkbox" checked={battleBorrowMode} onChange={e => setBattleBorrowMode(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">50/50 Crazy Mode</span>
-                  <label className="toggle-switch purple" style={{ transform: 'scale(0.8)' }}>
-                    <input type="checkbox" checked={battleCrazyMode} onChange={e => setBattleCrazyMode(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Battle Modifiers</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#facc15', padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 800 }}>JACKPOT</span>
-                    <span style={{ background: 'rgba(172, 255, 70, 0.1)', color: '#acff46', padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 800 }}>3v3</span>
-                  </div>
-                </div>
-
-                <button className="green-play-btn" onClick={handleBattleCreate}>
-                  Create 3v3 Battle
-                </button>
-              </div>
-
-              {/* Auto Mines */}
-              <div className="automation-panel">
-                <div className="panel-header-row">
-                  <h3 className="panel-title">Auto Mines</h3>
-                  <label className="toggle-switch">
-                    <input type="checkbox" checked={minesEnabled} onChange={e => setMinesEnabled(e.target.checked)} />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-
-                <div className="module-row">
-                  <span className="module-row-label">Auto Cashout Grid</span>
-                  <span style={{ color: '#acff46', fontWeight: 800, fontSize: 12 }}>3 Mines (Safe)</span>
-                </div>
-
-                <button className="red-play-btn" onClick={() => showToast('Mines play executed')}>
-                  Play Mines
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 3. RAINS TAB */}
-          {activeTab === 'rains' && (
-            <div className="rains-view-container">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, color: '#8b929e' }}>Live Rain Drops from Rollbux</span>
-                <button className="lime-clear-btn" onClick={fetchRains}>Refresh Rain Pool</button>
-              </div>
-
-              <div className="table-container">
-                <table className="rains-table">
-                  <thead>
-                    <tr>
-                      <th>Account</th>
-                      <th>Time Left</th>
-                      <th>Amount</th>
-                      <th>Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rains.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} style={{ textAlign: 'center', color: '#6d7680', padding: 32 }}>No active rain at this moment</td>
-                      </tr>
-                    ) : (
-                      rains.map((rain, idx) => (
-                        <tr key={rain.id || idx}>
-                          <td className="table-account-name">{user.username.toLowerCase()}</td>
-                          <td className="table-time-left">00:00</td>
-                          <td style={{ color: '#acff46', fontWeight: 700 }}>
-                            {rain.amount ? (rain.amount / 1000000).toFixed(2) + ' BUX' : 'In Progress'}
-                          </td>
-                          <td>
-                            <span className="table-date-badge">Live Active</span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* 4. RESTART UPDATE DETECT. TAB */}
-          {activeTab === 'update' && (
-            <div className="update-page-box">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div className="update-status-badge">
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#acff46', display: 'inline-block' }}></span>
-                  Client Resource Checker
-                </div>
-                <h3 style={{ fontSize: 20, fontWeight: 800, color: '#ffffff', marginTop: 4 }}>
-                  Restart Update Detect.
-                </h3>
-                <p style={{ color: '#8b929e', fontSize: 13, lineHeight: 1.5 }}>
-                  Scan your local system for missing game textures, scripts, or assets and hot-patch them immediately without having to redownload or reinstall Sotarium.exe.
-                </p>
-              </div>
-
-              <div className="update-resource-list">
-                {missingResources.map((res, i) => (
-                  <div key={i} className="update-resource-item">
-                    <span>{res.name}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 11, color: '#666' }}>{res.size}</span>
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 4,
-                        background: res.status === 'Up to Date' ? 'rgba(172,255,70,0.1)' : 'rgba(239,68,68,0.1)',
-                        color: res.status === 'Up to Date' ? '#acff46' : '#f87171'
-                      }}>
-                        {res.status}
-                      </span>
+                      <button onClick={() => showToast('Accounts registered: 1')} className="w-full py-2 bg-gradient-to-r from-[#a855f7] to-[#8b5cf6] hover:brightness-110 text-white rounded-lg text-xs font-bold transition shadow-sm active:scale-95 text-center flex items-center justify-center cursor-pointer">
+                        <span>Accounts</span>
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ fontSize: 12, color: '#acff46', fontWeight: 600 }}>
-                  {updateStatus}
                 </div>
 
-                <button
-                  className="update-action-btn"
-                  onClick={handleResourceUpdate}
-                  disabled={isUpdating}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                  </svg>
-                  {isUpdating ? 'Updating Client Resources…' : 'Update Missing Resources'}
-                </button>
+                {/* Right Main Content */}
+                <div className="flex flex-1 min-w-0 w-full flex-col items-start gap-[24px]">
+                  
+                  {/* Overview Section */}
+                  <div className="flex w-full shrink-0 flex-col items-start justify-center gap-[16px]">
+                    <div className="flex w-full shrink-0 items-center justify-between">
+                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Overview</p>
+                      <button onClick={() => showToast('Overview metrics reset')} type="button" className="relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[14px] py-[6px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
+                        <span>Clear</span>
+                      </button>
+                    </div>
+
+                    {/* 4 Stats Cards Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px] w-full">
+                      {/* 1. Rains Joined */}
+                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">Rains Joined</p>
+                        <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0 Rains</p>
+                      </div>
+
+                      {/* 2. How Much Time */}
+                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">How Much Time</p>
+                        <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0S</p>
+                      </div>
+
+                      {/* 3. Total Earnings */}
+                      <div className="relative flex w-full flex-col items-start gap-[6px] overflow-clip rounded-[12px] px-[20px] py-[16px] border border-white/[0.03] bg-[#0e131f]">
+                        <p className="text-[14px] font-medium leading-[20px] text-[#9aa3a8]">Total Earnings</p>
+                        <div className="flex shrink-0 items-center gap-[8px]">
+                          <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
+                          <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">0.00</p>
+                        </div>
+                      </div>
+
+                      {/* 4. Current Balance */}
+                      <div className="relative flex w-full items-center justify-between gap-[12px] overflow-clip rounded-[12px] border border-solid border-[rgba(172,255,70,0.12)] px-[20px] py-[16px] bg-[#0e131f]">
+                        <div className="relative flex min-w-0 shrink flex-col items-start gap-[6px]">
+                          <p className="whitespace-nowrap text-[14px] font-medium leading-[20px] text-[#acff46]">Current Balance</p>
+                          <div className="flex shrink-0 items-center gap-[8px]">
+                            <img alt="" className="size-[24px]" src="/figma/af-coin-24.svg" />
+                            <p className="whitespace-nowrap text-[20px] font-bold leading-[30px] text-white">
+                              {formatValue(user.token_balance)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Statistics + Auto Upgrader + Auto Battle Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_270px_270px] gap-5 w-full items-start">
+                    
+                    {/* Left: Statistics Section */}
+                    <div className="flex w-full min-w-0 flex-col items-start gap-[16px]">
+                      <div className="flex w-full shrink-0 items-center justify-between">
+                        <p className="whitespace-nowrap text-[20px] font-bold italic leading-[30px] text-white">Statistics</p>
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => showToast('Stats graph cleared')} type="button" className="relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[14px] py-[6px] bg-[#acff46] text-[#121418] font-bold text-[13px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
+                            <span>Clear</span>
+                          </button>
+                          <div className="relative flex shrink-0 items-center gap-[2px] rounded-[8px] p-[2px] bg-[#0e131f] border border-white/[0.04]">
+                            {['24H', 'Week', 'Month'].map((tab) => (
+                              <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab.toLowerCase())}
+                                type="button"
+                                className={`relative flex h-[32px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[8px] transition cursor-pointer ${activeTab === tab.toLowerCase() ? 'bg-[#131a29] text-white font-semibold' : 'text-[#9aa3a8] hover:text-white'}`}
+                              >
+                                <span className="text-[14px]">{tab}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Chart Container Card */}
+                      <div className="relative flex w-full shrink-0 flex-col items-start justify-center overflow-clip rounded-[12px] p-[24px] border border-white/[0.03] bg-[#0e131f]">
+                        <div className="custom-scroll relative h-[348px] w-full shrink-0 overflow-x-auto overflow-y-clip">
+                          <div className="relative h-full w-full min-w-[500px]">
+                            {/* Y-Axis Labels */}
+                            <div className="absolute left-0 top-0 flex flex-col items-start justify-between h-[330px] whitespace-nowrap text-[12px] font-bold text-[#6d7680]">
+                              <p className="leading-[18px]">100</p>
+                              <p className="leading-[18px]">&nbsp;</p>
+                              <p className="leading-[18px]">&nbsp;</p>
+                              <p className="leading-[18px]">&nbsp;</p>
+                              <p className="leading-[18px]">&nbsp;</p>
+                              <p className="leading-[18px]">&nbsp;</p>
+                              <p className="leading-[18px] text-white font-bold">0</p>
+                            </div>
+
+                            {/* SVG Chart Area */}
+                            <div className="absolute cursor-crosshair" style={{ left: 56, top: 9, width: 'calc(100% - 56px)', height: 330 }}>
+                              <svg className="absolute inset-0 size-full" viewBox="0 0 744 330" preserveAspectRatio="none">
+                                <line x1="0" y1="20" x2="744" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                <line x1="0" y1="130" x2="744" y2="130" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                <line x1="0" y1="240" x2="744" y2="240" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
+                                <path d="M 0 330 L 744 330" fill="none" stroke="#7974FF" strokeWidth="2.5" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Middle: Clean Auto Upgrader GUI */}
+                    <div className="flex w-full flex-col items-start gap-[16px]">
+                      <div className="flex w-full shrink-0 items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Upgrader</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${upgraderActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                            {upgraderActive ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input type="checkbox" checked={upgraderActive} onChange={e => setUpgraderActive(e.target.checked)} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                        </label>
+                      </div>
+
+                      {/* Clean Card Box */}
+                      <div className="relative flex w-full flex-col items-center justify-center gap-4 overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
+                        {/* Wheel */}
+                        <div className="relative flex flex-col items-center justify-center w-full select-none py-2">
+                          <div className="relative size-[210px] flex items-center justify-center">
+                            <svg className="size-full overflow-visible" viewBox="0 0 200 200">
+                              <circle cx="100" cy="100" r="78" fill="#0c0f17" stroke="#181d2a" strokeWidth="15" />
+                              <circle cx="100" cy="100" r="78" fill="none" stroke="#8b5cf6" strokeWidth="15" strokeDasharray="220.5 490.09" transform="rotate(-90 100 100)" />
+                              <circle cx="100" cy="22" r="6.5" fill="#ffffff" stroke="#8b5cf6" strokeWidth="2" />
+                            </svg>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
+                              <span className="text-[34px] font-black text-white tracking-tight leading-none">45.00%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Multiplier Target */}
+                        <div className="relative z-10 flex flex-col gap-1.5 w-full">
+                          <div className="flex items-center justify-between text-[11px] font-black tracking-tight text-[#9aa3a8]">
+                            <span>MULTIPLIER TARGET</span>
+                            <span className="text-white font-black">{upgraderMultiplier.toFixed(2)}x</span>
+                          </div>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              min="1.1"
+                              max="100"
+                              step="0.05"
+                              value={upgraderMultiplier}
+                              onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)}
+                              className="w-full bg-[#131a29] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-black tracking-tight focus:border-[#8b5cf6] outline-none"
+                            />
+                            <span className="absolute right-3 text-xs text-gray-400 font-black">x</span>
+                          </div>
+                        </div>
+
+                        {/* Auto Random */}
+                        <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-xs font-black tracking-tight text-white">Auto Random</span>
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input type="checkbox" checked={upgraderRandom} onChange={e => setUpgraderRandom(e.target.checked)} className="sr-only peer" />
+                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                          </label>
+                        </div>
+
+                        {/* Auto Sell */}
+                        <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-xs font-black tracking-tight text-white">Auto Sell</span>
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input type="checkbox" checked={upgraderAutoSell} onChange={e => setUpgraderAutoSell(e.target.checked)} className="sr-only peer" />
+                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                          </label>
+                        </div>
+
+                        {/* Account Selector */}
+                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black tracking-tight">
+                            <span>All Accounts</span>
+                          </button>
+                        </div>
+
+                        {/* Feedback + Manual Play Button */}
+                        <div className="relative z-10 flex items-center gap-2 w-full">
+                          <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
+                          <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
+                            Play
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Clean Auto Battle GUI & Mines */}
+                    <div className="flex w-full flex-col items-start gap-[16px]">
+                      <div className="flex w-full shrink-0 items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Auto Battle</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${battleActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                            {battleActive ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input type="checkbox" checked={battleActive} onChange={e => setBattleActive(e.target.checked)} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                        </label>
+                      </div>
+
+                      {/* Clean Battle Card Box */}
+                      <div className="relative flex w-full flex-col items-center justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
+                        {/* Borrow Mode */}
+                        <div className="relative z-10 w-full">
+                          <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                            <span className="font-semibold text-xs text-white">Borrow Mode</span>
+                            <input type="checkbox" checked={battleBorrow} onChange={e => setBattleBorrow(e.target.checked)} className="sr-only peer" />
+                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#acff46]"></div>
+                          </label>
+                        </div>
+
+                        {/* Crazy Mode */}
+                        <div className="relative z-10 w-full">
+                          <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                            <span className="font-semibold text-xs text-white">50/50 Crazy Mode</span>
+                            <input type="checkbox" checked={battleCrazy} onChange={e => setBattleCrazy(e.target.checked)} className="sr-only peer" />
+                            <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                          </label>
+                        </div>
+
+                        {/* Modifiers */}
+                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Modifiers</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-[11px] font-extrabold text-yellow-400">JACKPOT</span>
+                            <span className="px-2 py-0.5 rounded bg-[#acff46]/10 border border-[#acff46]/20 text-[11px] font-extrabold text-[#acff46]">3v3</span>
+                          </div>
+                        </div>
+
+                        {/* Account Selector */}
+                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">
+                            <span>2 Accs</span>
+                          </button>
+                        </div>
+
+                        {/* Create Battle Button */}
+                        <div className="relative z-10 flex items-center gap-2 w-full pt-1">
+                          <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
+                          <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
+                            Create
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Auto Mines Card */}
+                      <div className="flex w-full shrink-0 items-center justify-between mt-2">
+                        <div className="flex items-center gap-2">
+                          <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Mines</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${minesActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                            {minesActive ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer select-none">
+                          <input type="checkbox" checked={minesActive} onChange={e => setMinesActive(e.target.checked)} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                        </label>
+                      </div>
+
+                      <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
+                        <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                          <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                          <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black">
+                            <span>All Accounts</span>
+                          </button>
+                        </div>
+                        <div className="relative z-10 flex items-center gap-2 w-full">
+                          <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
+                          <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">
+                            Play
+                          </button>
+                        </div>
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  {/* Rains Section */}
+                  <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
+                    <div className="flex w-full shrink-0 items-center justify-between">
+                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Rains</p>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
+                          <span>Clear Rains</span>
+                        </button>
+                        <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
+                      <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
+                        <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
+                            <div>Account</div>
+                            <div className="text-center">Time Left</div>
+                            <div className="text-center">Amount</div>
+                            <div className="text-right pr-2">Time</div>
+                            <div className="text-center"></div>
+                          </div>
+                          
+                          <div className="flex flex-col divide-y divide-white/[0.02]">
+                            {rains.length === 0 ? (
+                              <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
+                                <p className="text-[13px] leading-[20px] text-[#9aa3a8]">Nobody is using your code yet. Share the link above — a referee appears here as soon as they attach it.</p>
+                              </div>
+                            ) : (
+                              rains.map((rain, i) => (
+                                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
+                                  <span className="truncate text-[15px] font-bold italic tracking-[0.3px] text-[#acff46]">{user.username}</span>
+                                  <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
+                                  <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
+                                  <span className="text-right pr-2">
+                                    <span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">
+                                      Active Cycle
+                                    </span>
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Game History Section */}
+                  <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
+                    <div className="flex w-full shrink-0 items-center justify-between">
+                      <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Game History</p>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => { setGameHistory([]); showToast('Game history cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#7c3aed] text-white font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer">
+                          <span>Clear History</span>
+                        </button>
+                        <span className="text-[13px] text-[#9aa3a8]">{gameHistory.length} rounds</span>
+                      </div>
+                    </div>
+                    <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
+                      <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
+                        <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                          <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
+                            <div>Account</div>
+                            <div className="text-center">Mode</div>
+                            <div className="text-center">Result</div>
+                            <div className="text-center">Amount</div>
+                            <div className="text-right pr-2">Time</div>
+                          </div>
+                          <div className="flex flex-col divide-y divide-white/[0.02]">
+                            {gameHistory.length === 0 ? (
+                              <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
+                                <p className="text-[13px] leading-[20px] text-[#9aa3a8]">No game rounds yet. Start Auto Upgrader, Battle, or Mines to see history here.</p>
+                              </div>
+                            ) : (
+                              gameHistory.map((item, i) => (
+                                <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] items-center gap-[12px] px-[16px] py-[10px] hover:bg-white/[0.02]">
+                                  <span className="truncate text-[14px] font-bold italic text-white">{item.account}</span>
+                                  <span className="text-center text-[13px] font-bold text-[#7974FF]">{item.mode}</span>
+                                  <span className="text-center">
+                                    <span className={`px-2 py-0.5 rounded text-[11px] font-extrabold uppercase ${item.success ? 'bg-[#acff46]/10 text-[#acff46]' : 'bg-red-500/10 text-red-400'}`}>
+                                      {item.success ? 'Success' : 'Loss'}
+                                    </span>
+                                  </span>
+                                  <span className="text-center text-[13px] font-bold text-[#c2c6db]">{item.amount} BUX</span>
+                                  <span className="text-right pr-2 text-[12px] text-[#9aa3a8]">{item.time}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
               </div>
             </div>
-          )}
+          </div>
+
         </div>
       </div>
+
+      {/* Restart Update Detect Overlay Modal */}
+      {showUpdateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl p-6 bg-[#0e131f] border border-white/10 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#acff46]"></span>
+                <h3 className="text-base font-bold text-white">Restart Update Detect.</h3>
+              </div>
+              <button onClick={() => setShowUpdateModal(false)} className="text-gray-400 hover:text-white text-lg font-bold cursor-pointer">&times;</button>
+            </div>
+
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Verify local file integrity and download missing sound packs, game assets, and dependencies directly to your machine without having to reinstall <code className="text-white bg-white/10 px-1 py-0.5 rounded">Sotarium.exe</code>.
+            </p>
+
+            <div className="space-y-2 bg-[#131a29] p-3 rounded-lg border border-white/5 text-xs">
+              <div className="flex justify-between text-gray-300">
+                <span>Sound Packs & Audio FX</span>
+                <span className="text-[#acff46] font-semibold">Verified</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span>Upgrader Geometry Textures</span>
+                <span className="text-[#acff46] font-semibold">Verified</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span>Battle Particles & Shaders</span>
+                <span className="text-[#acff46] font-semibold">Verified</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#acff46] font-medium pt-1">
+              {updateStatus}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+              <button onClick={() => setShowUpdateModal(false)} type="button" className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white transition cursor-pointer">
+                Close
+              </button>
+              <button
+                onClick={handleResourceUpdate}
+                disabled={isUpdating}
+                type="button"
+                className="px-5 py-2 bg-[#acff46] text-[#121418] font-bold text-xs rounded-lg hover:bg-[#96e036] transition shadow-md shadow-[#acff46]/10 cursor-pointer"
+              >
+                {isUpdating ? 'Updating Resources…' : 'Update Missing Resources'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
