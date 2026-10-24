@@ -226,7 +226,7 @@ function UpdateDetectedScreen({ onComplete }) {
                     style={{
                       height: '100%',
                       width: `${progress}%`,
-                      background: '#acff46',
+                      background: '#ffffff',
                       transition: 'width 0.15s ease'
                     }}
                   />
@@ -244,6 +244,7 @@ function RollbuxDashboard({ user, onLogout }) {
   const [currentUnit, setCurrentUnit] = useState('BUX')
   const [toast, setToast] = useState('')
   const [activeTab, setActiveTab] = useState('24h')
+  const [sideTab, setSideTab] = useState('home') // 'home' | 'automations' | 'rains'
 
   // Fullscreen update screen trigger
   const [showUpdateScreen, setShowUpdateScreen] = useState(false)
@@ -422,23 +423,68 @@ function RollbuxDashboard({ user, onLogout }) {
     return bux.toFixed(2)
   }
 
+  // Side nav items
+  const NAV_ITEMS = [
+    { id: 'home', label: 'Home', icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+    )},
+    { id: 'automations', label: 'Automations', icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+    )},
+    { id: 'rains', label: 'Rains', icon: (
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+    )},
+  ]
+
   return (
-    <div className="flex w-full justify-center pb-[40px] pt-[35px] selection:bg-[#acff46] selection:text-[#0e131f]">
+    <div className="flex w-full min-h-screen selection:bg-[#acff46] selection:text-[#0e131f]">
       {/* Draggable header strip for frameless window */}
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       {toast && <div className="toast-notice">{toast}</div>}
 
-      
-      {false && (
-        <UpdateDetectedScreen
-          onComplete={() => {
-            setShowUpdateScreen(false)
-            showToast('Client update successfully installed!')
-          }}
-        />
-      )}
+      {/* Left Sidebar Navigation */}
+      <div style={{ width: 220, minWidth: 220, maxWidth: 220 }} className="flex flex-col min-h-screen bg-[#0b0e17] border-r border-white/[0.04] pt-[40px] pb-6 px-3 gap-2 shrink-0">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5 px-3 mb-4">
+          <img src={brandIconBase64} alt="Sotarium" style={{ width: 30, height: 30, objectFit: 'contain' }} />
+          <span className="text-[16px] font-black italic text-white tracking-tight">Sotarium</span>
+        </div>
+        {/* Nav tabs */}
+        <div className="flex flex-col gap-1">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setSideTab(item.id)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold transition cursor-pointer w-full text-left ${sideTab === item.id ? 'bg-[#131a29] text-white border border-white/[0.06]' : 'text-[#9aa3a8] hover:text-white hover:bg-white/[0.03]'}` }
+            >
+              <span className={sideTab === item.id ? 'text-[#acff46]' : ''}>{item.icon}</span>
+              {item.label}
+              {sideTab === item.id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#acff46]"></span>}
+            </button>
+          ))}
+        </div>
+        {/* Spacer */}
+        <div className="flex-1" />
+        {/* User card at bottom */}
+        <div className="px-2 py-3 rounded-xl bg-[#131a29] border border-white/[0.05] flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full bg-[#acff46]/20 border border-[#acff46]/30 flex items-center justify-center shrink-0">
+            <span className="text-[12px] font-black text-[#acff46]">{user.username?.[0]?.toUpperCase() || 'S'}</span>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[12px] font-bold text-white truncate">{user.username}</span>
+            <span className="text-[10px] text-[#9aa3a8]">Lvl {user.level}</span>
+          </div>
+        </div>
+      </div>
 
+      {/* Main content area */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-y-auto" style={{ height: '100vh' }}>
+
+      
+      {/* Tab: Home */}
+      {sideTab === 'home' && 
       <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8">
         <div className="flex w-full flex-col items-start gap-[28px]">
           
@@ -459,15 +505,6 @@ function RollbuxDashboard({ user, onLogout }) {
                     </button>
                     <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
                   </div>
-
-                  {/* Trigger Fullscreen Update Screen */}
-                  <button
-                    onClick={() => setShowUpdateScreen(true)}
-                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#131a29] border border-white/10 hover:border-[#acff46]/40 text-xs font-bold text-gray-300 hover:text-white transition shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-[#acff46] animate-pulse"></span>
-                    <span>Restart Update Detect.</span>
-                  </button>
                 </div>
               </div>
             </div>
@@ -966,7 +1003,176 @@ function RollbuxDashboard({ user, onLogout }) {
           </div>
 
         </div>
-      </div>
+      </div>}
+      {/* Tab: Automations */}
+      {sideTab === 'automations' && (
+        <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8 pt-[35px] pb-[40px]">
+          <div className="flex w-full flex-col items-start gap-[28px]">
+            <div className="flex w-full flex-col items-center justify-center">
+              <div className="flex w-full items-center justify-between">
+                <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    Log Out
+                  </button>
+                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">Automations</h1>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
+              {/* Auto Upgrader */}
+              <div className="flex w-full flex-col items-start gap-[12px]">
+                <div className="flex w-full shrink-0 items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Upgrader</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${upgraderActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{upgraderActive ? 'Active' : 'Disabled'}</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input type="checkbox" checked={upgraderActive} onChange={e => setUpgraderActive(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                  </label>
+                </div>
+                <div className="relative flex w-full flex-col items-center justify-center gap-4 overflow-clip rounded-[12px] bg-[#0e131f] p-[20px] border border-white/[0.03]">
+                  <div className="relative z-10 flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center justify-between text-[11px] font-black tracking-tight text-[#9aa3a8]">
+                      <span>MULTIPLIER TARGET</span>
+                      <span className="text-white font-black">{upgraderMultiplier.toFixed(2)}x</span>
+                    </div>
+                    <div className="relative flex items-center">
+                      <input type="number" min="1.1" max="100" step="0.05" value={upgraderMultiplier} onChange={e => setUpgraderMultiplier(parseFloat(e.target.value) || 1.1)} className="w-full bg-[#131a29] border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-black tracking-tight focus:border-[#8b5cf6] outline-none" />
+                      <span className="absolute right-3 text-xs text-gray-400 font-black">x</span>
+                    </div>
+                  </div>
+                  <div className="relative z-10 flex items-center justify-between p-2.5 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                    <span className="text-xs font-black tracking-tight text-white">Auto Random</span>
+                    <label className="relative inline-flex items-center cursor-pointer select-none">
+                      <input type="checkbox" checked={upgraderRandom} onChange={e => setUpgraderRandom(e.target.checked)} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                    </label>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-2 w-full">
+                    <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{upgraderFeedback}</span>
+                    <button onClick={executeUpgraderPlay} type="button" className="shrink-0 px-4 py-2 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Play</button>
+                  </div>
+                </div>
+              </div>
+              {/* Auto Battle */}
+              <div className="flex w-full flex-col items-start gap-[12px]">
+                <div className="flex w-full shrink-0 items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Auto Battle</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${battleActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{battleActive ? 'Active' : 'Disabled'}</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input type="checkbox" checked={battleActive} onChange={e => setBattleActive(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                  </label>
+                </div>
+                <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
+                  <div className="relative z-10 w-full">
+                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                      <span className="font-semibold text-xs text-white">Borrow Tokens</span>
+                      <input type="checkbox" checked={battleBorrow} onChange={e => setBattleBorrow(e.target.checked)} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                    </label>
+                  </div>
+                  <div className="relative z-10 w-full">
+                    <label className="px-3 py-2.5 rounded-lg flex items-center justify-between gap-2 bg-[#131a29] border border-white/[0.06] shadow-sm cursor-pointer select-none">
+                      <span className="font-semibold text-xs text-white">50/50 Crazy Mode</span>
+                      <input type="checkbox" checked={battleCrazy} onChange={e => setBattleCrazy(e.target.checked)} className="sr-only peer" />
+                      <div className="w-9 h-5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#8b5cf6]"></div>
+                    </label>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-2 w-full pt-1">
+                    <span className="text-xs text-[#9aa3a8] truncate flex-1">{battleFeedback}</span>
+                    <button onClick={executeBattleCreate} type="button" className="shrink-0 px-4 py-2 bg-[#acff46] hover:brightness-110 text-[#121418] text-xs font-bold rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Create</button>
+                  </div>
+                </div>
+              </div>
+              {/* Auto Mines */}
+              <div className="flex w-full flex-col items-start gap-[12px]">
+                <div className="flex w-full shrink-0 items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-black tracking-tight italic">Auto Mines</p>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${minesActive ? 'bg-[#acff46]/10 border border-[#acff46]/30 text-[#acff46]' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>{minesActive ? 'Active' : 'Disabled'}</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer select-none">
+                    <input type="checkbox" checked={minesActive} onChange={e => setMinesActive(e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                  </label>
+                </div>
+                <div className="relative flex w-full flex-col justify-center gap-3 overflow-clip rounded-[12px] bg-[#0e131f] p-[16px] border border-white/[0.03]">
+                  <div className="relative z-10 flex items-center justify-between p-2 rounded-lg bg-[#131a29] border border-white/5 w-full">
+                    <span className="text-[11px] font-semibold text-[#9aa3a8]">Account</span>
+                    <button type="button" className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#7c3aed] text-white text-xs font-black"><span>All Accounts</span></button>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-2 w-full">
+                    <span className="text-xs font-black tracking-tight text-[#9aa3a8] truncate flex-1">{minesFeedback}</span>
+                    <button onClick={executeMinesPlay} type="button" className="shrink-0 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-black tracking-tight rounded-lg transition active:scale-95 shadow-sm cursor-pointer">Play</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Tab: Rains */}
+      {sideTab === 'rains' && (
+        <div className="flex w-full max-w-[1536px] flex-col items-start gap-[28px] px-4 md:px-8 pt-[35px] pb-[40px]">
+          <div className="flex w-full flex-col items-start gap-[28px]">
+            <div className="flex w-full flex-col items-center justify-center">
+              <div className="flex w-full items-center justify-between">
+                <div className="flex shrink-0 flex-col items-start gap-[6px]">
+                  <button onClick={onLogout} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition active:scale-95 shadow-sm cursor-pointer">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    Log Out
+                  </button>
+                  <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
+                </div>
+              </div>
+            </div>
+            <div className="flex w-full shrink-0 flex-col items-start gap-[16px]">
+              <div className="flex w-full shrink-0 items-center justify-between">
+                <p className="whitespace-nowrap text-[20px] leading-[30px] text-white font-bold italic">Active Rains</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => { setRains([]); showToast('Rains cleared'); }} type="button" className="relative flex h-[30px] shrink-0 items-center justify-center overflow-clip rounded-[7px] px-[12px] py-[5px] bg-[#acff46] text-[#121418] font-bold text-[12px] hover:brightness-110 active:scale-95 transition shadow-sm cursor-pointer"><span>Clear Rains</span></button>
+                  <span className="text-[13px] text-[#9aa3a8]">{rains.length} rain</span>
+                </div>
+              </div>
+              <div className="flex w-full shrink-0 flex-col items-center gap-[12px]">
+                <div className="custom-scroll w-full max-w-full overflow-x-auto overflow-y-hidden">
+                  <div className="relative w-full min-w-[650px] shrink-0 rounded-[12px] border border-white/[0.03] overflow-hidden bg-[#0e131f]" style={{ minHeight: 164 }}>
+                    <div className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[14px] text-[13px] font-semibold tracking-[0.28px] text-[#9aa3a8] border-b border-white/[0.04]">
+                      <div>Account</div>
+                      <div className="text-center">Time Left</div>
+                      <div className="text-center">Amount</div>
+                      <div className="text-right pr-2">Time</div>
+                      <div className="text-center"></div>
+                    </div>
+                    <div className="flex flex-col divide-y divide-white/[0.02]">
+                      {rains.length === 0 ? (
+                        <div className="flex h-[120px] items-center justify-center px-[32px] text-center">
+                          <p className="text-[13px] leading-[20px] text-[#9aa3a8]">No active rains. The rain bot will auto-join when a cycle is detected.</p>
+                        </div>
+                      ) : (
+                        rains.map((rain, i) => (
+                          <div key={i} className="grid grid-cols-[1fr_1fr_1fr_1fr_40px] items-center gap-[12px] px-[16px] py-[10px] bg-[rgba(172,255,70,0.03)]">
+                            <span className="truncate text-[15px] font-bold italic tracking-[0.3px] text-[#acff46]">{user.username}</span>
+                            <span className="text-center text-[14px] font-bold text-[#acff46] font-mono">00:00</span>
+                            <span className="text-center text-[14px] font-semibold text-[#c2c6db] italic">In Progress</span>
+                            <span className="text-right pr-2"><span className="inline-flex h-[24px] items-center rounded-[6px] px-[8px] text-[12px] font-semibold text-[#50f07b] bg-[rgba(80,240,123,0.12)]">Active Cycle</span></span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div> {/* End main content area */}
     </div>
   )
 }
