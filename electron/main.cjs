@@ -543,12 +543,21 @@ app.whenReady().then(() => {
         cleaned = cleaned.slice(1, -1).trim()
       }
 
-      // If user pasted a cookie header or string containing token=...
-      const cookieMatch = cleaned.match(/(?:^|;s*|)(?:token|__Secure-token)=([a-zA-Z0-9_-.]+)/i)
-      let token = cookieMatch ? cookieMatch[1] : cleaned
+      // If user pasted a cookie string containing token=... or __Secure-token=...
+      let token = cleaned;
+      if (cleaned.includes('token=') || cleaned.includes('token:')) {
+        const parts = cleaned.split(';');
+        for (const p of parts) {
+          const trimmedP = p.trim();
+          if (/^(?:token|__Secure-token)\s*[:=]/i.test(trimmedP)) {
+            token = trimmedP.replace(/^(?:token|__Secure-token)\s*[:=]\s*/i, '').trim();
+            break;
+          }
+        }
+      }
 
-      // Remove "Bot " or "Bearer " prefix if user added it
-      token = token.replace(/^(?:Bearer|Bot)s+/i, '').trim()
+      // Remove 'Bot ' or 'Bearer ' prefix if user added it
+      token = token.replace(/^(?:Bearer|Bot)\s+/i, '').trim();
 
       if (token.length < 15) {
         return resolve({ ok: false, error: 'Invalid Discord token length. Please paste a valid user token.' })
