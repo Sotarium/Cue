@@ -640,7 +640,9 @@ function RollbuxDashboard({ user, onLogout }) {
 
   // Battle execution
   const executeBattleCreate = async () => {
-    setBattleFeedback('Creating 3v3 battle...')
+    // 50% crazy mode, 50% normal mode when battleCrazy is toggled on
+    const isCrazyMode = battleCrazy ? (Math.random() < 0.5) : false
+    setBattleFeedback(`Creating 3v3 battle (${isCrazyMode ? 'Crazy' : 'Normal'})...`)
     try {
       const res = await window.electronAPI.backendCall({
         endpoint: '/api/battles/create',
@@ -648,7 +650,7 @@ function RollbuxDashboard({ user, onLogout }) {
         body: {
           username: user.username,
           borrow: battleBorrow,
-          crazy_mode: battleCrazy,
+          crazy_mode: isCrazyMode,
         }
       })
       if (res.ok && res.data?.success) {
@@ -667,13 +669,6 @@ function RollbuxDashboard({ user, onLogout }) {
         const msg = (typeof res.data?.error === 'string' ? res.data.error : JSON.stringify(res.data?.error)) || res.data?.message || `HTTP ${res.statusCode}`
         setBattleFeedback(`Error: ${msg}`)
         showToast(`Battle error: ${msg}`)
-        setGameHistory(prev => [{
-          mode: 'Battle',
-          success: false,
-          account: user.username,
-          amount: '0.00',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }, ...prev])
       }
     } catch (e) {
       setBattleFeedback('Error')
