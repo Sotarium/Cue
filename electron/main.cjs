@@ -55,7 +55,7 @@ async function solveTurnstileWithHiddenWindow(sessionToken) {
   return new Promise((resolve) => {
     console.log('[CF] Opening hidden window to solve Turnstile...')
 
-    const hiddenSes = session.fromPartition('persist:cf-solver', { cache: true })
+    const hiddenSes = session.fromPartition('persist:rollbux-session', { cache: true })
 
     // Pre-inject the user's session cookie so Cloudflare sees an authenticated session
     hiddenSes.cookies.set({
@@ -277,46 +277,17 @@ const AUTO_RAIN_SCRIPT = `
   if (window.__sotariumAutoRainRunning) return;
   window.__sotariumAutoRainRunning = true;
 
-  // ── Step 1: Click the Chat nav button to open the rain/chat section ──────
-  function findChatButton() {
-    const allBtns = document.querySelectorAll('button');
-    for (const btn of allBtns) {
-      const spans = btn.querySelectorAll('span');
-      for (const span of spans) {
-        if ((span.textContent || '').trim().toLowerCase() === 'chat') return btn;
-      }
-    }
-    return null;
-  }
+  console.log('[Sotarium] Browser session active. Monitoring for rain events...');
 
-  function clickChatTab() {
-    const chatBtn = findChatButton();
-    if (chatBtn) {
-      console.log('[Sotarium AutoRain] Clicking Chat tab...');
-      chatBtn.click();
-      chatBtn.style.outline = '3px solid #acff46';
-      setTimeout(() => { if (chatBtn) chatBtn.style.outline = ''; }, 1500);
-      return true;
-    }
-    return false;
-  }
-
-  // Try clicking the Chat tab — retry until it appears (SPA may not have rendered it yet)
-  let chatClicked = false;
-  const chatRetry = setInterval(() => {
-    if (!chatClicked && clickChatTab()) {
-      chatClicked = true;
-      clearInterval(chatRetry);
-    }
-  }, 500);
-  // Give up after 10s if Chat tab never appears
-  setTimeout(() => clearInterval(chatRetry), 10000);
-
-  // ── Step 2: Watch for Join Rain button ────────────────────────────────────
   let lastClicked = 0;
-  const COOLDOWN_MS = 8000;
+  const COOLDOWN_MS = 10000;
 
   function findJoinRainButton() {
+    // Avoid clicking anything if a challenge modal is visible
+    if (document.querySelector('iframe[src*="cloudflare"], iframe[src*="challenges"], .cf-turnstile, [class*="turnstile"]')) {
+      return null;
+    }
+
     const buttons = document.querySelectorAll('button, a, div[role="button"], [class*="button"]');
     for (const btn of buttons) {
       if (btn.closest('#rollbux-autorain-hud')) continue;
@@ -329,12 +300,12 @@ const AUTO_RAIN_SCRIPT = `
     return null;
   }
 
-  function tryClick() {
+  function checkRain() {
     const now = Date.now();
     if (now - lastClicked < COOLDOWN_MS) return;
     const btn = findJoinRainButton();
     if (btn) {
-      console.log('[Sotarium AutoRain] Found Join Rain button — clicking');
+      console.log('[Sotarium] Found Join Rain button.');
       btn.click();
       lastClicked = now;
       btn.style.outline = '3px solid #acff46';
@@ -342,9 +313,8 @@ const AUTO_RAIN_SCRIPT = `
     }
   }
 
-  setInterval(tryClick, 400);
-  new MutationObserver(() => tryClick()).observe(document.body, { childList: true, subtree: true });
-  console.log('[Sotarium AutoRain] Watching for Chat tab + Join Rain button...');
+  // Moderate check interval to prevent anti-bot DOM tripwires
+  setInterval(checkRain, 2000);
 })();
 `
 
@@ -368,7 +338,7 @@ async function startRainBot(sessionToken) {
   const trimmed = (sessionToken || '').trim()
   if (!trimmed) return { ok: false, error: 'No session token' }
 
-  const botSes = session.fromPartition('persist:rain-bot', { cache: true })
+  const botSes = session.fromPartition('persist:rollbux-session', { cache: true })
 
   // Inject the session cookie
   await botSes.cookies.set({
