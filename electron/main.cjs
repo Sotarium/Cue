@@ -531,21 +531,47 @@ app.whenReady().then(() => {
   })
 
   // ─── Discord IPC Handlers ───────────────────────────────────────────────────
-  ipcMain.handle('discord-get-user', async (_event, token) => {
+  ipcMain.handle('discord-get-user', async (_event, rawInput) => {
     return new Promise((resolve) => {
-      if (!token || typeof token !== 'string' || token.trim().length < 10) {
-        return resolve({ ok: false, error: 'Invalid Discord token' })
+      if (!rawInput || typeof rawInput !== 'string') {
+        return resolve({ ok: false, error: 'Please enter your Discord token or cookie string' })
       }
-      const trimmed = token.trim()
+
+      let cleaned = rawInput.trim()
+      // Strip outer quotes if copied with quotes
+      if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+        cleaned = cleaned.slice(1, -1).trim()
+      }
+
+      // If user pasted a cookie header or string containing token=...
+      const cookieMatch = cleaned.match(/(?:^|;s*|)(?:token|__Secure-token)=([a-zA-Z0-9_-.]+)/i)
+      let token = cookieMatch ? cookieMatch[1] : cleaned
+
+      // Remove "Bot " or "Bearer " prefix if user added it
+      token = token.replace(/^(?:Bearer|Bot)s+/i, '').trim()
+
+      if (token.length < 15) {
+        return resolve({ ok: false, error: 'Invalid Discord token length. Please paste a valid user token.' })
+      }
+
+      const headers = {
+        'Authorization': token,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      }
+
+      // If user pasted a cookie string, pass it along in the Cookie header as well
+      if (rawInput.includes(';') || rawInput.includes('=')) {
+        headers['Cookie'] = rawInput.trim()
+      }
+
       const options = {
         hostname: 'discord.com',
         port: 443,
         path: '/api/v10/users/@me',
         method: 'GET',
-        headers: {
-          'Authorization': trimmed,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        headers
       }
 
       const req = https.request(options, (res) => {

@@ -1402,8 +1402,9 @@ function RollbuxDashboard({ user, onLogout }) {
               </div>
 
               {!discordUser ? (
-                /* Login / Token Input Card */
-                <div className="flex w-full max-w-[640px] flex-col gap-5 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-6 shadow-xl">
+                /* Login / Token Input Card Centered */
+                <div className="flex w-full flex-col items-center justify-center pt-8 pb-12">
+                  <div className="flex w-full max-w-[540px] flex-col gap-5 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-7 shadow-2xl">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#5865F2]">
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -1441,6 +1442,7 @@ function RollbuxDashboard({ user, onLogout }) {
                   >
                     {discordLoading ? 'Connecting...' : 'Connect Discord Account'}
                   </button>
+                  </div>
                 </div>
               ) : (
                 /* Logged In Dashboard with User Info and Toggles */
