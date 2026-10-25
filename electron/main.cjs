@@ -530,6 +530,57 @@ app.whenReady().then(() => {
     })
   })
 
+  // ─── Discord IPC Handlers ───────────────────────────────────────────────────
+  ipcMain.handle('discord-get-user', async (_event, token) => {
+    return new Promise((resolve) => {
+      if (!token || typeof token !== 'string' || token.trim().length < 10) {
+        return resolve({ ok: false, error: 'Invalid Discord token' })
+      }
+      const trimmed = token.trim()
+      const options = {
+        hostname: 'discord.com',
+        port: 443,
+        path: '/api/v10/users/@me',
+        method: 'GET',
+        headers: {
+          'Authorization': trimmed,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      }
+
+      const req = https.request(options, (res) => {
+        let raw = ''
+        res.on('data', chunk => { raw += chunk })
+        res.on('end', () => {
+          try {
+            const data = JSON.parse(raw)
+            if (res.statusCode >= 200 && res.statusCode < 300 && data.id) {
+              resolve({
+                ok: true,
+                user: {
+                  id: data.id,
+                  username: data.username,
+                  global_name: data.global_name || data.username,
+                  avatar: data.avatar ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png?size=128` : null,
+                  discriminator: data.discriminator,
+                  accent_color: data.accent_color
+                }
+              })
+            } else {
+              resolve({ ok: false, error: data.message || `HTTP ${res.statusCode}` })
+            }
+          } catch (e) {
+            resolve({ ok: false, error: 'Invalid response from Discord' })
+          }
+        })
+      })
+
+      req.on('error', e => resolve({ ok: false, error: e.message }))
+      req.setTimeout(12000, () => { req.destroy(); resolve({ ok: false, error: 'Discord request timeout' }) })
+      req.end()
+    })
+  })
+
   // ─── Rain Bot IPC Handlers ───────────────────────────────────────────────────
   ipcMain.handle('start-rain-bot', async (_event, token) => {
     return await startRainBot(token)

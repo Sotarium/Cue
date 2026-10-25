@@ -388,7 +388,91 @@ function RollbuxDashboard({ user, onLogout }) {
 
   // toast disabled
   const [activeTab, setActiveTab] = useState('24h')
-  const [sideTab, setSideTab] = useState('home') // 'home' | 'automations' | 'rains'
+  const [sideTab, setSideTab] = useState('home') // 'home' | 'automations' | 'rains' | 'discord'
+
+  // Discord Integration State
+  const [discordToken, setDiscordToken] = useState(() => window.localStorage.getItem('sotarium_discord_token') || '')
+  const [discordTokenInput, setDiscordTokenInput] = useState('')
+  const [discordUser, setDiscordUser] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem('sotarium_discord_user') || 'null')
+    } catch (e) {
+      return null
+    }
+  })
+  const [discordLoading, setDiscordLoading] = useState(false)
+  const [discordError, setDiscordError] = useState('')
+  const [autoJoinGiveaway, setAutoJoinGiveaway] = useState(() => window.localStorage.getItem('sotarium_auto_join_gw') === 'true')
+  const [autoClaimGiveaway, setAutoClaimGiveaway] = useState(() => window.localStorage.getItem('sotarium_auto_claim_gw') === 'true')
+
+  const handleDiscordLogin = async (tokenToUse) => {
+    const t = (tokenToUse || discordTokenInput || '').trim()
+    if (!t) {
+      setDiscordError('Please enter a Discord token')
+      return
+    }
+    setDiscordLoading(true)
+    setDiscordError('')
+    try {
+      if (window.electronAPI?.discordGetUser) {
+        const res = await window.electronAPI.discordGetUser(t)
+        if (res && res.ok && res.user) {
+          setDiscordUser(res.user)
+          setDiscordToken(t)
+          window.localStorage.setItem('sotarium_discord_token', t)
+          window.localStorage.setItem('sotarium_discord_user', JSON.stringify(res.user))
+          setDiscordTokenInput('')
+        } else {
+          setDiscordError(res?.error || 'Failed to authenticate with Discord')
+        }
+      } else {
+        // Web fallback
+        const resp = await fetch('https://discord.com/api/v10/users/@me', {
+          headers: { Authorization: t }
+        })
+        if (resp.ok) {
+          const d = await resp.json()
+          const u = {
+            id: d.id,
+            username: d.username,
+            global_name: d.global_name || d.username,
+            avatar: d.avatar ? `https://cdn.discordapp.com/avatars/${d.id}/${d.avatar}.png?size=128` : null,
+            discriminator: d.discriminator
+          }
+          setDiscordUser(u)
+          setDiscordToken(t)
+          window.localStorage.setItem('sotarium_discord_token', t)
+          window.localStorage.setItem('sotarium_discord_user', JSON.stringify(u))
+          setDiscordTokenInput('')
+        } else {
+          setDiscordError(`Authentication failed: HTTP ${resp.status}`)
+        }
+      }
+    } catch (err) {
+      setDiscordError(err.message || 'Network error verifying Discord token')
+    } finally {
+      setDiscordLoading(false)
+    }
+  }
+
+  const handleDiscordLogout = () => {
+    setDiscordUser(null)
+    setDiscordToken('')
+    setDiscordTokenInput('')
+    setDiscordError('')
+    window.localStorage.removeItem('sotarium_discord_token')
+    window.localStorage.removeItem('sotarium_discord_user')
+  }
+
+  const handleToggleAutoJoin = (val) => {
+    setAutoJoinGiveaway(val)
+    window.localStorage.setItem('sotarium_auto_join_gw', String(val))
+  }
+
+  const handleToggleAutoClaim = (val) => {
+    setAutoClaimGiveaway(val)
+    window.localStorage.setItem('sotarium_auto_claim_gw', String(val))
+  }
 
   // Fullscreen update screen trigger
   const [showUpdateScreen, setShowUpdateScreen] = useState(false)
@@ -831,6 +915,11 @@ function RollbuxDashboard({ user, onLogout }) {
     { id: 'rains', label: 'Rains', icon: (
       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
     )},
+    { id: 'discord', label: 'Discord', icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+      </svg>
+    )},
   ]
 
   return (
@@ -850,7 +939,7 @@ function RollbuxDashboard({ user, onLogout }) {
         </div>
 
         {/* Nav items */}
-        {['home', 'automations', 'rains'].map(id => (
+        {['home', 'automations', 'rains', 'discord'].map(id => (
           <button
             key={id}
             type="button"
@@ -1297,6 +1386,169 @@ function RollbuxDashboard({ user, onLogout }) {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Discord Tab ── */}
+        {sideTab === 'discord' && (
+          <div className="flex w-full justify-center pb-[40px] pt-[35px]">
+            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+              <div className="flex w-full items-center justify-between shrink-0">
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Discord Integration</h1>
+                  <p className="text-[13px] text-[#9aa3a8]">Connect your Discord account to manage automated giveaways</p>
+                </div>
+              </div>
+
+              {!discordUser ? (
+                /* Login / Token Input Card */
+                <div className="flex w-full max-w-[640px] flex-col gap-5 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-6 shadow-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#5865F2]/10 border border-[#5865F2]/30 text-[#5865F2]">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-[17px] font-bold text-white">Discord Authorization</h2>
+                      <p className="text-[12px] text-[#9aa3a8]">Enter your Discord user token to log in</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[12px] font-bold uppercase tracking-wider text-[#9aa3a8]">Discord Token</label>
+                    <input
+                      type="password"
+                      value={discordTokenInput}
+                      onChange={(e) => setDiscordTokenInput(e.target.value)}
+                      placeholder="Paste your Discord token here..."
+                      className="h-[44px] w-full rounded-[10px] border border-white/10 bg-[#131a29] px-4 text-[13px] text-white placeholder-white/20 outline-none focus:border-[#5865F2] transition"
+                    />
+                  </div>
+
+                  {discordError && (
+                    <div className="rounded-[8px] border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
+                      {discordError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => handleDiscordLogin()}
+                    disabled={discordLoading}
+                    type="button"
+                    className="flex h-[42px] items-center justify-center rounded-[10px] bg-[#5865F2] font-bold text-[14px] text-white hover:brightness-110 active:scale-98 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {discordLoading ? 'Connecting...' : 'Connect Discord Account'}
+                  </button>
+                </div>
+              ) : (
+                /* Logged In Dashboard with User Info and Toggles */
+                <div className="flex w-full flex-col gap-6 max-w-[900px]">
+                  {/* User Profile Card */}
+                  <div className="flex w-full items-center justify-between rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-5 shadow-xl">
+                    <div className="flex items-center gap-4">
+                      {discordUser.avatar ? (
+                        <img src={discordUser.avatar} alt="" className="h-[52px] w-[52px] rounded-full border border-white/10 object-cover" />
+                      ) : (
+                        <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#5865F2] font-bold text-[20px] text-white">
+                          {(discordUser.username?.[0] || 'D').toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[18px] font-bold text-white">{discordUser.global_name || discordUser.username}</span>
+                          <span className="rounded bg-[#5865F2]/20 px-2 py-0.5 text-[11px] font-semibold text-[#5865F2]">Connected</span>
+                        </div>
+                        <span className="text-[13px] text-[#9aa3a8]">@{discordUser.username} {discordUser.discriminator && discordUser.discriminator !== '0' ? `#${discordUser.discriminator}` : ''}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleDiscordLogout}
+                      type="button"
+                      className="flex h-[36px] items-center justify-center rounded-[8px] border border-white/10 bg-transparent px-4 text-[13px] font-semibold text-[#9aa3a8] hover:border-red-500/40 hover:text-red-400 transition cursor-pointer"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+
+                  {/* Giveaways Control Sections */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 w-full">
+                    {/* Auto Join Giveaway Card */}
+                    <div className="flex flex-col justify-between gap-4 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-6 shadow-xl">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#acff46]/10 text-[#acff46]">
+                              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                              </svg>
+                            </span>
+                            <h3 className="text-[16px] font-bold text-white">Auto Join Giveaway</h3>
+                          </div>
+                          {/* Toggle */}
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoJoinGiveaway}
+                              onChange={(e) => handleToggleAutoJoin(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#acff46]"></div>
+                          </label>
+                        </div>
+                        <p className="text-[13px] text-[#9aa3a8] leading-relaxed">
+                          Automatically reacts to or enters newly announced giveaways across configured channels.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                        <span className="text-[12px] font-semibold text-[#9aa3a8]">Status</span>
+                        <span className={`text-[12px] font-bold ${autoJoinGiveaway ? 'text-[#acff46]' : 'text-[#9aa3a8]'}`}>
+                          {autoJoinGiveaway ? 'Active & Watching' : 'Disabled'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Auto Claim Giveaway Card */}
+                    <div className="flex flex-col justify-between gap-4 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-6 shadow-xl">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#5865F2]/10 text-[#5865F2]">
+                              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                            <h3 className="text-[16px] font-bold text-white">Auto Claim Giveaway</h3>
+                          </div>
+                          {/* Toggle */}
+                          <label className="relative inline-flex items-center cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoClaimGiveaway}
+                              onChange={(e) => handleToggleAutoClaim(e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-11 h-6 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5865F2]"></div>
+                          </label>
+                        </div>
+                        <p className="text-[13px] text-[#9aa3a8] leading-relaxed">
+                          Instantly claims winning notifications or promo-code drops when your account is tagged.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
+                        <span className="text-[12px] font-semibold text-[#9aa3a8]">Status</span>
+                        <span className={`text-[12px] font-bold ${autoClaimGiveaway ? 'text-[#5865F2]' : 'text-[#9aa3a8]'}`}>
+                          {autoClaimGiveaway ? 'Active & Monitoring' : 'Disabled'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

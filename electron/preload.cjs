@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startRainBot: (token) => ipcRenderer.invoke('start-rain-bot', token),
   stopRainBot: () => ipcRenderer.invoke('stop-rain-bot'),
   rainBotStatus: () => ipcRenderer.invoke('rain-bot-status'),
+  discordGetUser: (token) => ipcRenderer.invoke('discord-get-user', token),
   backendCall: (opts) => ipcRenderer.invoke('backend-call', opts),
 })
