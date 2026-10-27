@@ -12,14 +12,16 @@
     "preview": "vite preview --host 0.0.0.0",
     "desktop:build": "npm run build && electron-builder --win portable --x64"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
   "devDependencies": {
+    "@vitejs/plugin-react": "latest",
     "electron": "latest",
     "electron-builder": "latest",
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "vite": "latest"
   },
   "build": {
     "appId": "com.sotarium.app",

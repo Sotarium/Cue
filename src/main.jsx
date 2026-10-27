@@ -64,7 +64,7 @@ async function authenticateToken(token) {
         username: user.username || user.name || 'Player',
         level: playerLevel,
         token_balance: liveBalance,
-        avatar: user.avatar_url || user.avatar || null,
+        avatar: user.avatar_url || user.avatar || user.profile_image || user.profile_picture || user.image_url || user.image || user.picture || null,
         raw: user
       }
     }
@@ -162,32 +162,37 @@ function CueAuthPage({ onAuthSuccess }) {
 }
 
 // ============================================================================
-// Fullscreen "Update Detected." Blocking View
+// Fullscreen "Update Detected." Blocking View — real auto-updater
 // ============================================================================
 
-function UpdateDetectedScreen({ onComplete }) {
-  const [updating, setUpdating] = useState(false)
+function UpdateDetectedScreen({ latestVersion, onSkip }) {
+  const [phase, setPhase] = useState('prompt')   // prompt | downloading | done | error
   const [progress, setProgress] = useState(0)
-  const [isDone, setIsDone] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  const handleStartUpdate = () => {
-    setUpdating(true)
-    let current = 0
+  const handleUpdate = async () => {
+    setPhase('downloading')
+    setProgress(0)
 
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 8) + 4
-      if (current >= 100) {
-        current = 100
-        setProgress(100)
-        clearInterval(interval)
-        setIsDone(true)
-        setTimeout(() => {
-          onComplete()
-        }, 1400)
-      } else {
-        setProgress(current)
-      }
-    }, 120)
+    // Listen for real download progress from main process
+    let removeListener = () => {}
+    if (window.electronAPI?.onUpdateProgress) {
+      removeListener = window.electronAPI.onUpdateProgress(({ percent }) => {
+        if (percent >= 0) setProgress(Math.min(percent, 99))
+      })
+    }
+
+    const result = await window.electronAPI?.downloadAndInstallUpdate?.()
+    removeListener()
+
+    if (result?.ok) {
+      setProgress(100)
+      setPhase('done')
+      // Main process will spawn the new exe and quit — nothing more needed here
+    } else {
+      setErrorMsg(result?.error || 'Download failed.')
+      setPhase('error')
+    }
   }
 
   return (
@@ -195,50 +200,50 @@ function UpdateDetectedScreen({ onComplete }) {
       <div style={{ position: 'fixed', top: 0, left: 0, right: 140, height: 32, WebkitAppRegion: 'drag', zIndex: 100 }} />
 
       <div className="update-screen-card">
-        {isDone ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, animation: 'toastSlideDown 0.3s ease-out' }}>
-            <img
-              src={checkIconBase64}
-              alt="Updated"
-              style={{ width: 72, height: 72, objectFit: 'contain' }}
-            />
-            <h1 className="update-screen-title" style={{ fontSize: 24, fontStyle: 'normal' }}>
-              Updated Sotarium
+        {phase === 'done' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, width: '100%', textAlign: 'center', animation: 'fadeInCenter 0.3s ease-out' }}>
+            <img src={checkIconBase64} alt="Done" style={{ width: 76, height: 76, objectFit: 'contain' }} />
+            <h1 className="update-screen-title" style={{ fontSize: 24, fontStyle: 'normal', textAlign: 'center', width: '100%' }}>
+              Updated! Relaunching…
             </h1>
           </div>
+        ) : phase === 'error' ? (
+          <>
+            <img src={brandIconBase64} alt="Sotarium Icon" style={{ width: 68, height: 68, objectFit: 'contain' }} />
+            <div>
+              <h1 className="update-screen-title">Update Failed</h1>
+              <p className="update-screen-desc" style={{ marginTop: 6, color: '#ff5555' }}>{errorMsg}</p>
+            </div>
+            <button className="update-white-button" onClick={onSkip}>Continue Anyway</button>
+          </>
+        ) : phase === 'downloading' ? (
+          <>
+            <img src={brandIconBase64} alt="Sotarium Icon" style={{ width: 68, height: 68, objectFit: 'contain' }} />
+            <div>
+              <h1 className="update-screen-title">Downloading v{latestVersion}…</h1>
+              <p className="update-screen-desc" style={{ marginTop: 6 }}>{progress}%</p>
+            </div>
+            <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 9999, overflow: 'hidden', marginTop: 12 }}>
+              <div style={{ height: '100%', width: `${progress}%`, background: '#acff46', transition: 'width 0.2s ease' }} />
+            </div>
+          </>
         ) : (
           <>
-            <img
-              src={brandIconBase64}
-              alt="Sotarium Icon"
-              style={{ width: 68, height: 68, objectFit: 'contain' }}
-            />
-
+            <img src={brandIconBase64} alt="Sotarium Icon" style={{ width: 68, height: 68, objectFit: 'contain' }} />
             <div>
               <h1 className="update-screen-title">Update Detected.</h1>
               <p className="update-screen-desc" style={{ marginTop: 6 }}>
-                A new version or missing resources were detected for your client. Update now to sync the latest files without reinstalling.
+                A new version <strong style={{ color: '#acff46' }}>v{latestVersion}</strong> is available.
+                Sotarium will download and relaunch automatically.
               </p>
             </div>
-
-            {!updating ? (
-              <button className="update-white-button" onClick={handleStartUpdate}>
-                Update
-              </button>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, width: '100%', marginTop: 12 }}>
-                <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 9999, overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${progress}%`,
-                      background: '#ffffff',
-                      transition: 'width 0.15s ease'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
+            <button className="update-white-button" onClick={handleUpdate}>Update Now</button>
+            <button
+              onClick={onSkip}
+              style={{ background: 'none', border: 'none', color: '#555', fontSize: 12, cursor: 'pointer', marginTop: -4 }}
+            >
+              Skip for now
+            </button>
           </>
         )}
       </div>
@@ -417,9 +422,10 @@ function RollbuxDashboard({ user, onLogout }) {
       if (window.electronAPI?.discordGetUser) {
         const res = await window.electronAPI.discordGetUser(t)
         if (res && res.ok && res.user) {
+          const finalToken = res.token || t
           setDiscordUser(res.user)
-          setDiscordToken(t)
-          window.localStorage.setItem('sotarium_discord_token', t)
+          setDiscordToken(finalToken)
+          window.localStorage.setItem('sotarium_discord_token', finalToken)
           window.localStorage.setItem('sotarium_discord_user', JSON.stringify(res.user))
           setDiscordTokenInput('')
         } else {
@@ -464,14 +470,101 @@ function RollbuxDashboard({ user, onLogout }) {
     window.localStorage.removeItem('sotarium_discord_user')
   }
 
+  const [discordGwLogs, setDiscordGwLogs] = useState([])
+  const [gwStats, setGwStats] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('sotarium_gw_stats_24h') || '{}')
+      const now = Date.now()
+      if (saved.date && (now - saved.date < 24 * 60 * 60 * 1000)) {
+        return saved
+      }
+    } catch (e) {}
+    return { joined: 0, won: 0, lost: 0, date: Date.now() }
+  })
+
+  useEffect(() => {
+    if (!window.electronAPI?.onDiscordGwLog) return
+    const cleanup = window.electronAPI.onDiscordGwLog((log) => {
+      setDiscordGwLogs((prev) => [log, ...prev].slice(0, 15))
+      if (log.message === 'Successfully Joined') {
+        setGwStats(prev => {
+          const next = { ...prev, joined: prev.joined + 1, lost: Math.max(0, (prev.joined + 1) - prev.won) }
+          window.localStorage.setItem('sotarium_gw_stats_24h', JSON.stringify(next))
+          return next
+        })
+      } else if (log.message === 'Giveaway won') {
+        setGwStats(prev => {
+          const next = { ...prev, won: prev.won + 1, lost: Math.max(0, prev.joined - (prev.won + 1)) }
+          window.localStorage.setItem('sotarium_gw_stats_24h', JSON.stringify(next))
+          return next
+        })
+      }
+    })
+    return cleanup
+  }, [])
+
+  useEffect(() => {
+    if ((autoJoinGiveaway || autoClaimGiveaway)) {
+      if (!discordToken) {
+        setDiscordGwLogs(prev => [{
+          message: 'Discord token not found in memory. Please reconnect Discord account above.',
+          type: 'error',
+          time: new Date().toLocaleTimeString()
+        }, ...prev].slice(0, 15))
+        return
+      }
+      if (window.electronAPI?.startDiscordGiveawayBot) {
+        window.electronAPI.startDiscordGiveawayBot(discordToken)
+      }
+      if (window.electronAPI?.setDiscordBotFlags) {
+        window.electronAPI.setDiscordBotFlags({ 
+          autoJoin: autoJoinGiveaway, 
+          autoClaim: autoClaimGiveaway,
+          username: discordUser?.username || 'sotarium',
+          rollbuxUsername: user?.username || 'sotarium'
+        })
+      }
+    } else if (!autoJoinGiveaway && !autoClaimGiveaway) {
+      if (window.electronAPI?.stopDiscordGiveawayBot) {
+        window.electronAPI.stopDiscordGiveawayBot()
+      }
+    }
+  }, [autoJoinGiveaway, autoClaimGiveaway, discordToken, discordUser])
+
   const handleToggleAutoJoin = (val) => {
     setAutoJoinGiveaway(val)
     window.localStorage.setItem('sotarium_auto_join_gw', String(val))
+    if (window.electronAPI?.setDiscordBotFlags) {
+      window.electronAPI.setDiscordBotFlags({ 
+        autoJoin: val, 
+        autoClaim: autoClaimGiveaway,
+        username: discordUser?.username || 'sotarium',
+        rollbuxUsername: user?.username || 'sotarium'
+      })
+    }
+    if (val && discordToken && window.electronAPI?.startDiscordGiveawayBot) {
+      window.electronAPI.startDiscordGiveawayBot(discordToken)
+    } else if (!val && !autoClaimGiveaway && window.electronAPI?.stopDiscordGiveawayBot) {
+      window.electronAPI.stopDiscordGiveawayBot()
+    }
   }
 
   const handleToggleAutoClaim = (val) => {
     setAutoClaimGiveaway(val)
     window.localStorage.setItem('sotarium_auto_claim_gw', String(val))
+    if (window.electronAPI?.setDiscordBotFlags) {
+      window.electronAPI.setDiscordBotFlags({ 
+        autoJoin: autoJoinGiveaway, 
+        autoClaim: val,
+        username: discordUser?.username || 'sotarium',
+        rollbuxUsername: user?.username || 'sotarium'
+      })
+    }
+    if (val && discordToken && window.electronAPI?.startDiscordGiveawayBot) {
+      window.electronAPI.startDiscordGiveawayBot(discordToken)
+    } else if (!val && !autoJoinGiveaway && window.electronAPI?.stopDiscordGiveawayBot) {
+      window.electronAPI.stopDiscordGiveawayBot()
+    }
   }
 
   // Fullscreen update screen trigger
@@ -618,23 +711,30 @@ function RollbuxDashboard({ user, onLogout }) {
     return () => clearInterval(interval)
   }, [])
 
-  // Live level & balance polling — scrape actively every 8 seconds
+  // Live level & balance polling — scrape actively every second for avatar & live stats
   const [liveLevel, setLiveLevel] = useState(user.level || user.raw?.level || 1)
   const [levelBadge, setLevelBadge] = useState(user.level || user.raw?.level || 1)
   const [liveBalance, setLiveBalance] = useState(user.token_balance || 0)
+  const [liveAvatar, setLiveAvatar] = useState(user.avatar || user.raw?.avatar_url || user.raw?.avatar || null)
 
   useEffect(() => {
     const token = window.localStorage.getItem('sotarium_session_token') || ''
     const doFetch = async () => {
-      // 1. Fetch live level
+      // 1. Fetch live level & avatar every second
       if (window.electronAPI?.fetchLevel) {
         const res = await window.electronAPI.fetchLevel(token)
-        if (res && res.ok && res.level !== null && res.level > 0) {
-          setLiveLevel(res.level)
-          if (res.badge) setLevelBadge(res.badge)
+        if (res && res.ok) {
+          if (res.level !== null && res.level > 0) {
+            setLiveLevel(res.level)
+            if (res.badge) setLevelBadge(res.badge)
+          }
+          if (res.avatar) {
+            setLiveAvatar(res.avatar)
+          }
           try {
             const cached = JSON.parse(window.localStorage.getItem('sotarium_user_profile') || '{}')
-            cached.level = res.level
+            if (res.level) cached.level = res.level
+            if (res.avatar) cached.avatar = res.avatar
             window.localStorage.setItem('sotarium_user_profile', JSON.stringify(cached))
           } catch (e) {}
         }
@@ -666,7 +766,7 @@ function RollbuxDashboard({ user, onLogout }) {
       }
     }
     doFetch()
-    const interval = setInterval(doFetch, 8000)
+    const interval = setInterval(doFetch, 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -968,9 +1068,18 @@ function RollbuxDashboard({ user, onLogout }) {
             Log Out
           </button>
           <div style={{ padding: '10px 12px', borderRadius: 12, background: '#131a29', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
-            </div>
+            {liveAvatar ? (
+              <img
+                src={liveAvatar}
+                alt=""
+                style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', border: '1px solid rgba(172,255,70,0.3)', flexShrink: 0 }}
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            ) : (
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(172,255,70,0.15)', border: '1px solid rgba(172,255,70,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 900, color: '#acff46' }}>{(user.username?.[0] || 'S').toUpperCase()}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1019,7 +1128,7 @@ function RollbuxDashboard({ user, onLogout }) {
         {/* ════ HOME TAB ════ */}
         {sideTab === 'home' && (
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
-            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+            <div className="flex w-full max-w-[1100px] mx-auto flex-col items-center gap-[28px] px-6">
 
               {/* Header */}
               <h1 className="whitespace-nowrap text-[25px] tracking-[0.5px] text-white font-bold italic">{user.username}</h1>
@@ -1174,7 +1283,7 @@ function RollbuxDashboard({ user, onLogout }) {
         {/* ════ AUTOMATIONS TAB ════ */}
         {sideTab === 'automations' && (
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
-            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+            <div className="flex w-full max-w-[1100px] mx-auto flex-col items-center gap-[28px] px-6">
               <div className="flex shrink-0 flex-col items-start gap-[6px]">
 
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Automations</h1>
@@ -1305,7 +1414,7 @@ function RollbuxDashboard({ user, onLogout }) {
         {/* ════ RAINS TAB ════ */}
         {sideTab === 'rains' && (
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
-            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+            <div className="flex w-full max-w-[1100px] mx-auto flex-col items-center gap-[28px] px-6">
               <div className="flex w-full items-center justify-between shrink-0">
                 <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Rains</h1>
                 <button
@@ -1393,7 +1502,7 @@ function RollbuxDashboard({ user, onLogout }) {
         {/* ── Discord Tab ── */}
         {sideTab === 'discord' && (
           <div className="flex w-full justify-center pb-[40px] pt-[35px]">
-            <div className="flex w-full max-w-[1400px] flex-col items-start gap-[28px] px-6">
+            <div className="flex w-full max-w-[1100px] mx-auto flex-col items-center gap-[28px] px-6">
               <div className="flex w-full items-center justify-between shrink-0">
                 <div className="flex flex-col gap-1">
                   <h1 className="text-[25px] tracking-[0.5px] text-white font-bold italic">Discord Integration</h1>
@@ -1446,7 +1555,7 @@ function RollbuxDashboard({ user, onLogout }) {
                 </div>
               ) : (
                 /* Logged In Dashboard with User Info and Toggles */
-                <div className="flex w-full flex-col gap-6 max-w-[900px]">
+                <div className="flex w-full flex-col gap-6 max-w-[900px] mx-auto">
                   {/* User Profile Card */}
                   <div className="flex w-full items-center justify-between rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-5 shadow-xl">
                     <div className="flex items-center gap-4">
@@ -1508,7 +1617,7 @@ function RollbuxDashboard({ user, onLogout }) {
                       <div className="flex items-center justify-between pt-3 border-t border-white/[0.04]">
                         <span className="text-[12px] font-semibold text-[#9aa3a8]">Status</span>
                         <span className={`text-[12px] font-bold ${autoJoinGiveaway ? 'text-[#acff46]' : 'text-[#9aa3a8]'}`}>
-                          {autoJoinGiveaway ? 'Active & Watching' : 'Disabled'}
+                          {autoJoinGiveaway ? 'Active & Watching (Channel #1564378251575562300)' : 'Disabled'}
                         </span>
                       </div>
                     </div>
@@ -1549,6 +1658,49 @@ function RollbuxDashboard({ user, onLogout }) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Discord Giveaway Activity Feed */}
+                  {(autoJoinGiveaway || autoClaimGiveaway) && (
+                    <div className="flex flex-col gap-3 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-5 shadow-xl w-full">
+                      <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-2 w-2 rounded-full bg-[#acff46] animate-pulse"></span>
+                          <span className="text-[14px] font-bold text-white">Giveaway Bot Logs</span>
+                        </div>
+                        <span className="text-[12px] text-[#9aa3a8]">Listening to channel #1564378251575562300</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
+                        {discordGwLogs.length === 0 ? (
+                          <div className="py-2 text-[12px] text-[#9aa3a8]/60 italic">Waiting for giveaways to appear in channel...</div>
+                        ) : (
+                          discordGwLogs.map((log, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-[12px]">
+                              <span className="text-[#9aa3a8]/50 shrink-0 font-mono">[{log.time}]</span>
+                              <span className={log.type === 'success' ? 'text-[#acff46] font-medium' : log.type === 'error' ? 'text-red-400 font-medium' : log.type === 'warn' ? 'text-yellow-400' : 'text-[#c0c6cf]'}>
+                                {log.message}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {/* 24h Recap Cards */}
+                      <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-white/[0.06] mt-1">
+                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-white/[0.03] border border-white/[0.04]">
+                          <span className="text-[11px] font-medium text-[#9aa3a8] uppercase tracking-wider">Joined</span>
+                          <span className="text-[16px] font-bold text-white mt-0.5">{gwStats.joined}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-[#acff46]/[0.04] border border-[#acff46]/10">
+                          <span className="text-[11px] font-medium text-[#acff46] uppercase tracking-wider">Won</span>
+                          <span className="text-[16px] font-bold text-[#acff46] mt-0.5">{gwStats.won}</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-red-500/[0.04] border border-red-500/10">
+                          <span className="text-[11px] font-medium text-red-400 uppercase tracking-wider">Lost</span>
+                          <span className="text-[16px] font-bold text-red-400 mt-0.5">{gwStats.lost}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1563,30 +1715,43 @@ function RollbuxDashboard({ user, onLogout }) {
 function DesktopApp() {
   const CURRENT_APP_VERSION = '1.0.5'
   const [showUpdate, setShowUpdate] = useState(false)
+  const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
   const [loadingInitial, setLoadingInitial] = useState(true)
 
   const registeredToken = window.localStorage.getItem('sotarium_registered_token')
 
-  // Check if a real new version is available on GitHub
+  // Check for a real new version via Electron IPC (main process hits GitHub API)
   useEffect(() => {
-    const checkActualUpdate = async () => {
+    const checkForUpdate = async () => {
       try {
-        const lastAcknowledged = window.localStorage.getItem('sotarium_acknowledged_version')
-        const res = await fetch('https://api.github.com/repos/Sotarium/Cue/releases/latest')
-        if (res.ok) {
-          const data = await res.json()
-          const latestTag = (data.tag_name || '').replace(/^v/, '').trim()
-          if (latestTag && latestTag !== CURRENT_APP_VERSION && latestTag !== lastAcknowledged) {
-            setShowUpdate(true)
-            return
+        let updateAvailable = false
+        let latest = ''
+
+        if (window.electronAPI?.checkForUpdate) {
+          // Running as packaged .exe — use main-process IPC
+          const result = await window.electronAPI.checkForUpdate()
+          updateAvailable = !!result?.updateAvailable
+          latest = result?.latestVersion || ''
+        } else {
+          // Running in browser/dev — fall back to direct GitHub fetch
+          const res = await fetch('https://api.github.com/repos/Sotarium/Cue/releases/latest')
+          if (res.ok) {
+            const data = await res.json()
+            latest = (data.tag_name || '').replace(/^v/, '').trim()
+            updateAvailable = latest && latest !== CURRENT_APP_VERSION
           }
         }
+
+        if (updateAvailable && latest) {
+          setLatestVersion(latest)
+          setShowUpdate(true)
+        }
       } catch (e) {
-        // Offline or GitHub rate limit, skip update screen
+        // Offline or rate-limited — skip silently
       }
     }
-    checkActualUpdate()
+    checkForUpdate()
   }, [])
 
   useEffect(() => {
@@ -1625,10 +1790,8 @@ function DesktopApp() {
   if (showUpdate) {
     return (
       <UpdateDetectedScreen
-        onComplete={() => {
-          window.localStorage.setItem('sotarium_acknowledged_version', '1.0.6')
-          setShowUpdate(false)
-        }}
+        latestVersion={latestVersion}
+        onSkip={() => setShowUpdate(false)}
       />
     )
   }

@@ -24,9 +24,22 @@ function extractLevelFromPayload(rawText, data) {
   return 1
 }
 
-const { app, BrowserWindow, ipcMain, session } = require('electron')
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron')
 const path = require('path')
 const https = require('https')
+const fs = require('fs')
+const os = require('os')
+const { spawn } = require('child_process')
+const WebSocket = require('ws')
+
+// Disable Chromium internal network services that trigger Windows Firewall prompts
+app.commandLine.appendSwitch('disable-features', 'MediaRouter,DialMediaRouteProvider,WebRtcHideLocalIpsWithMdns,CalculateNativeWinOcclusion')
+app.commandLine.appendSwitch('disable-device-discovery-notifications')
+app.commandLine.appendSwitch('disable-background-networking')
+app.commandLine.appendSwitch('disable-component-update')
+app.commandLine.appendSwitch('disable-domain-reliability')
+app.commandLine.appendSwitch('disable-sync')
+app.commandLine.appendSwitch('no-default-browser-check')
 
 // Ensure single instance to prevent duplicate processes or flashing
 const gotTheLock = app.requestSingleInstanceLock()
@@ -254,7 +267,7 @@ function verifyRollbuxSession(token) {
             username: user.username || user.name || 'Player',
             level: playerLevel,
             token_balance: liveBalance,
-            avatar: user.avatar_url || user.avatar || null,
+            avatar: user.avatar_url || user.avatar || user.profile_image || user.profile_picture || user.image_url || user.image || user.picture || null,
             raw: user
           }
         })
@@ -322,13 +335,10 @@ const AUTO_RAIN_SCRIPT = `
 let rainBotWindow = null
 
 async function injectAutoRainScript(webContents) {
-  if (!webContents || webContents.isDestroyed()) return false
   try {
     await webContents.executeJavaScript(AUTO_RAIN_SCRIPT)
-    return true
   } catch (e) {
     console.log('[RainBot] Script injection skipped:', e.message)
-    return false
   }
 }
 
@@ -369,8 +379,8 @@ async function startRainBot(sessionToken) {
   rainBotWindow = new BrowserWindow({
     width: 1024,
     height: 768,
-    show: true,           // Visible for testing
-    skipTaskbar: false,
+    show: false,
+    skipTaskbar: true,
     title: 'Sotarium — Rain Bot',
     webPreferences: {
       session: botSes,
@@ -379,67 +389,42 @@ async function startRainBot(sessionToken) {
     }
   })
 
-  const botWindow = rainBotWindow
   const wc = rainBotWindow.webContents
 
   // Inject script after every navigation (SPA re-routes too)
   wc.on('did-finish-load', async () => {
-    try {
-      if (wc.isDestroyed() || botWindow.isDestroyed()) return
-      const url = wc.getURL()
-      if (url.includes('rollbux.com')) {
-        console.log('[RainBot] Page loaded:', url)
-        const injected = await injectAutoRainScript(wc)
-        if (!injected || wc.isDestroyed() || botWindow.isDestroyed()) return
-        // Poll cookies for cf_clearance and update cache
+    if (!rainBotWindow || rainBotWindow.isDestroyed() || wc.isDestroyed()) return
+    const url = wc.getURL()
+    if (url.includes('rollbux.com')) {
+      console.log('[RainBot] Page loaded:', url)
+      await injectAutoRainScript(wc)
+      // Poll cookies for cf_clearance and update cache
+      if (rainBotWindow && !rainBotWindow.isDestroyed()) {
         const cookies = await botSes.cookies.get({ url: 'https://rollbux.com' })
         const cf = cookies.find(c => c.name === 'cf_clearance')
         if (cf && cf.value) {
           cfClearanceCache = { value: cf.value, expires: Date.now() + 29 * 60 * 1000 }
         }
       }
-    } catch (e) {
-      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Load handler skipped:', e.message)
     }
   })
 
   // Also handle SPA navigation without full reload
   wc.on('did-navigate-in-page', async () => {
-    try {
-      if (wc.isDestroyed() || botWindow.isDestroyed()) return
-      await injectAutoRainScript(wc)
-    } catch (e) {
-      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Navigation handler skipped:', e.message)
-    }
+    if (!rainBotWindow || rainBotWindow.isDestroyed() || wc.isDestroyed()) return
+    await injectAutoRainScript(wc)
   })
 
   wc.on('did-fail-load', (_e, code, desc, url) => {
-    try {
-      console.log('[RainBot] Load failed:', code, desc, url)
-      // Retry after 5s if it's a network error
-      if (code !== -3) {
-        setTimeout(() => {
-          try {
-            if (!wc.isDestroyed() && !botWindow.isDestroyed()) wc.reload()
-          } catch (e) {
-            if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Reload skipped:', e.message)
-          }
-        }, 5000)
-      }
-    } catch (e) {
-      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Failure handler skipped:', e.message)
-    }
+    console.log('[RainBot] Load failed:', code, desc, url)
+    // Retry after 5s if it's a network error
+    if (code !== -3) setTimeout(() => { if (rainBotWindow && !rainBotWindow.isDestroyed()) wc.reload() }, 5000)
   })
 
-  rainBotWindow.on('closed', () => {
-    try { wc.removeAllListeners() } catch (e) {}
-    if (rainBotWindow === botWindow) rainBotWindow = null
-  })
+  rainBotWindow.on('closed', () => { rainBotWindow = null })
 
   rainBotWindow.loadURL('https://rollbux.com', {
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  }).catch((error) => {
-    if (!wc.isDestroyed()) console.log('[RainBot] Navigation failed:', error.message)
   })
 
   console.log('[RainBot] Started — running silently on rollbux.com')
@@ -463,7 +448,884 @@ function getRainBotStatus() {
   }
 }
 
+// ─── Discord Giveaway Bot (WebSocket + REST) ────────────────────────────────
+const GUILD_ID      = '1454106247056982130'
+const GW_CHANNEL_ID = '1564378251575562300'
+const TKT_PANEL_ID  = '1564093343904825537'
+
+let discordGwActive    = false
+let discordClaimActive = false
+let discordGwUsername  = 'sotarium'
+let rollbuxUsername    = 'sotarium'
+let _lastWonGwMessageLink = ''
+
+let _gwSocket       = null  // WebSocket
+let _gwGuildId      = '1454106247056982130'
+let _gwToken        = ''
+let _gwSessionId    = null
+let _gwHeartbeatInt = null
+let _gwUserId       = null
+let _gwResumeUrl    = null
+let _gwSeq          = null
+// Track messages we already reacted to
+const _joinedGiveaways = new Set()
+// Claim flow state
+let _claimState = 'idle'   // idle | waiting_ticket_msg | claiming_done
+
+function sendDiscordGwLog(message, type = 'info') {
+  console.log(`[DiscordGW] ${message}`)
+  const allowedExact = ['Successfully Joined', 'Giveaway won', 'Auto Claimed']
+  if (!allowedExact.includes(message)) {
+    return
+  }
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send('discord-gw-log', { message, type, time: new Date().toLocaleTimeString() })
+  }
+}
+
+// ── REST helpers ────────────────────────────────────────────────────────────
+function discordRequest(method, endpoint, body = null) {
+  return new Promise((resolve, reject) => {
+    const data = body ? JSON.stringify(body) : null
+    const opts = {
+      hostname: 'discord.com',
+      path: `/api/v10${endpoint}`,
+      method,
+      headers: {
+        'Authorization': _gwToken,
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+        'X-Super-Properties': Buffer.from(JSON.stringify({
+          os: 'Windows', browser: 'Chrome', device: '', browser_version: '120.0.0.0'
+        })).toString('base64')
+      }
+    }
+    if (data) opts.headers['Content-Length'] = Buffer.byteLength(data)
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', c => raw += c)
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: raw ? JSON.parse(raw) : null }) }
+        catch { resolve({ status: res.statusCode, body: raw }) }
+      })
+    })
+    req.on('error', reject)
+    if (data) req.write(data)
+    req.end()
+  })
+}
+
+// PUT /channels/{ch}/messages/{msg}/reactions/{emoji}/@me
+async function putReaction(channelId, messageId, emoji) {
+  const enc = encodeURIComponent(emoji)
+  const r = await discordRequest('PUT', `/channels/${channelId}/messages/${messageId}/reactions/${enc}/@me`)
+  return r.status === 204
+}
+
+// POST /channels/{ch}/messages  → send a message
+async function sendMessage(channelId, content) {
+  const r = await discordRequest('POST', `/channels/${channelId}/messages`, { content })
+  return { ok: r.status === 200 || r.status === 201, status: r.status, body: r.body }
+}
+
+// POST /channels/{ch}/messages with buffer attachments (multipart/form-data)
+async function sendMessageWithBufferAttachments(channelId, content, items = []) {
+  try {
+    const fd = new FormData()
+    if (content) {
+      fd.append('payload_json', JSON.stringify({ content }))
+    }
+    items.forEach((item, index) => {
+      if (item && item.buffer) {
+        fd.append(`files[${index}]`, new Blob([item.buffer], { type: 'image/png' }), item.name || `image_${index}.png`)
+      }
+    })
+
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': _gwToken,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+      },
+      body: fd
+    })
+
+    const body = await res.json().catch(() => null)
+    return { ok: res.ok, status: res.status, body }
+  } catch (err) {
+    return { ok: false, status: 500, error: err.message }
+  }
+}
+
+// POST /channels/{ch}/messages with attachments (multipart/form-data)
+async function sendMessageWithAttachments(channelId, content, filePaths = []) {
+  try {
+    const fd = new FormData()
+    if (content) {
+      fd.append('payload_json', JSON.stringify({ content }))
+    }
+    filePaths.forEach((fp, index) => {
+      if (fs.existsSync(fp)) {
+        const buf = fs.readFileSync(fp)
+        const filename = path.basename(fp)
+        fd.append(`files[${index}]`, new Blob([buf], { type: 'image/png' }), filename)
+      }
+    })
+
+    const res = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Authorization': _gwToken,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+      },
+      body: fd
+    })
+
+    const body = await res.json().catch(() => null)
+    return { ok: res.ok, status: res.status, body }
+  } catch (err) {
+    return { ok: false, status: 500, error: err.message }
+  }
+}
+
+// Cache for found slash commands
+let _guildCommandsCache = null
+
+// Fetch guild application commands (slash commands)
+async function getGuildCommands(guildId, channelId) {
+  if (_guildCommandsCache && _guildCommandsCache.length) return _guildCommandsCache
+  const targetGuildId = guildId || _gwGuildId || GUILD_ID
+  
+  // 1. Search in channel
+  const r = await discordRequest('GET', `/channels/${channelId}/application-commands/search?query=invites&limit=10`)
+  if (r.status === 200 && Array.isArray(r.body?.application_commands) && r.body.application_commands.length > 0) {
+    _guildCommandsCache = r.body.application_commands
+    return _guildCommandsCache
+  }
+  
+  // 2. Search in guild command index
+  const rGuild = await discordRequest('GET', `/guilds/${targetGuildId}/application-command-index`)
+  if (rGuild.status === 200 && Array.isArray(rGuild.body?.application_commands) && rGuild.body.application_commands.length > 0) {
+    _guildCommandsCache = rGuild.body.application_commands
+    return _guildCommandsCache
+  }
+
+  return []
+}
+
+// Execute a slash command interaction like /invites (clicks top / first match)
+async function executeSlashCommand(channelId, commandName = 'invites') {
+  const targetGuildId = _gwGuildId || GUILD_ID
+  try {
+    const commands = await getGuildCommands(targetGuildId, channelId)
+    // Filter matching commands and pick the top one (matching the UI dropdown selection)
+    const matches = commands.filter(c => c.name && c.name.toLowerCase().startsWith(commandName.toLowerCase()))
+    const cmd = matches.find(c => c.name.toLowerCase() === commandName.toLowerCase()) || matches[0]
+
+    if (cmd) {
+      const payload = {
+        type: 2, // APPLICATION_COMMAND
+        application_id: cmd.application_id,
+        guild_id: targetGuildId,
+        channel_id: channelId,
+        session_id: _gwSessionId || 'sotarium',
+        data: {
+          version: cmd.version,
+          id: cmd.id,
+          name: cmd.name,
+          type: cmd.type || 1,
+          options: [],
+          application_command: {
+            id: cmd.id,
+            application_id: cmd.application_id,
+            version: cmd.version,
+            default_member_permissions: cmd.default_member_permissions || null,
+            type: cmd.type || 1,
+            name: cmd.name,
+            description: cmd.description || '',
+            dm_permission: true
+          },
+          attachments: []
+        },
+        nonce: Date.now().toString()
+      }
+      const res = await clickButton(payload)
+      if (res.ok) return true
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  return false
+}
+
+// Helper: send claim payload into ticket channel (gw link, g.m, /invites, 4 proof images, User : ...)
+async function sendTicketClaimPayload(channelId) {
+  const targetGuildId = _gwGuildId || GUILD_ID
+  const gwLink = _lastWonGwMessageLink || `https://discord.com/channels/${targetGuildId}/${GW_CHANNEL_ID}`
+  const userTag = rollbuxUsername || discordGwUsername || 'sotarium'
+
+  // 1. Giveaway link
+  await sendMessage(channelId, gwLink)
+  await new Promise(r => setTimeout(r, 700))
+
+  // 2. g.m
+  await sendMessage(channelId, 'g.m')
+  await new Promise(r => setTimeout(r, 700))
+
+  // 3. /invites user: <discord handle> (try real slash command, fallback to text)
+  const discordHandle = (discordGwUsername || 'sotarium').replace(/^@/, '')
+  const slashOk = await executeSlashCommand(channelId, 'invites', discordHandle)
+  if (!slashOk) {
+    await sendMessage(channelId, `/invites user: ${discordHandle}`)
+  }
+  await new Promise(r => setTimeout(r, 900))
+
+  // 4. The 4 proof images — upload as real file attachments (one per message, no text = embed)
+  //    Images are bundled in the app under electron/proof_images/
+  const proofDir = path.join(__dirname, 'proof_images')
+  const proofFiles = ['proof1_youtube.png', 'proof2_tiktok.png', 'proof3_instagram.png', 'proof4_twitter.png']
+  for (const filename of proofFiles) {
+    const filePath = path.join(proofDir, filename)
+    if (fs.existsSync(filePath)) {
+      await sendImageAttachment(channelId, filePath)
+    }
+    await new Promise(r => setTimeout(r, 1000))
+  }
+
+  // 5. User : <rollbux user>
+  await sendMessage(channelId, `User : ${userTag}`)
+  return true
+}
+
+// Upload a single image file as a Discord attachment (shows as embed, not a link)
+async function sendImageAttachment(channelId, filePath) {
+  try {
+    const buf = fs.readFileSync(filePath)
+    const filename = path.basename(filePath)
+    const boundary = '----FormBoundary' + Date.now()
+    const CRLF = '\r\n'
+
+    // Build multipart body manually so we don't need extra deps
+    const metaPart = Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="payload_json"${CRLF}` +
+      `Content-Type: application/json${CRLF}${CRLF}` +
+      `{}${CRLF}`
+    )
+    const filePart1 = Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="files[0]"; filename="${filename}"${CRLF}` +
+      `Content-Type: image/png${CRLF}${CRLF}`
+    )
+    const filePart2 = Buffer.from(`${CRLF}--${boundary}--${CRLF}`)
+    const body = Buffer.concat([metaPart, filePart1, buf, filePart2])
+
+    return new Promise((resolve) => {
+      const opts = {
+        hostname: 'discord.com',
+        path: `/api/v10/channels/${channelId}/messages`,
+        method: 'POST',
+        headers: {
+          'Authorization': _gwToken,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': body.length
+        }
+      }
+      const req = https.request(opts, res => {
+        let raw = ''
+        res.on('data', c => raw += c)
+        res.on('end', () => resolve({ ok: res.statusCode === 200 || res.statusCode === 201, status: res.statusCode }))
+      })
+      req.on('error', e => resolve({ ok: false, error: e.message }))
+      req.write(body)
+      req.end()
+    })
+  } catch (err) {
+    console.error('[sendImageAttachment] Error:', err.message)
+    return { ok: false, error: err.message }
+  }
+}
+
+// POST /interactions  (click a component button)
+async function clickButton(payload) {
+  const r = await discordRequest('POST', '/interactions', payload)
+  return { ok: r.status === 204 || r.status === 200, status: r.status, body: r.body }
+}
+
+// GET /channels/{id}
+async function getChannel(channelId) {
+  const r = await discordRequest('GET', `/channels/${channelId}`)
+  if (r.status === 200 && r.body?.guild_id) return r.body
+  return null
+}
+
+// GET /guilds/{id}/channels
+async function getGuildChannels(guildId = null) {
+  const gId = guildId || _gwGuildId || GUILD_ID
+  const r = await discordRequest('GET', `/guilds/${gId}/channels`)
+  if (r.status === 200 && Array.isArray(r.body)) return r.body
+  return []
+}
+
+// GET /channels/{id}/messages?limit=5
+async function getMessages(channelId, limit = 5) {
+  const r = await discordRequest('GET', `/channels/${channelId}/messages?limit=${limit}`)
+  if (r.status === 200 && Array.isArray(r.body)) return r.body
+  return []
+}
+
+// ── Gateway WebSocket ────────────────────────────────────────────────────────
+function _gwSend(op, d) {
+  if (_gwSocket && _gwSocket.readyState === 1 /* OPEN */) {
+    _gwSocket.send(JSON.stringify({ op, d }))
+  }
+}
+
+function _gwStartHeartbeat(interval) {
+  if (_gwHeartbeatInt) clearInterval(_gwHeartbeatInt)
+  _gwHeartbeatInt = setInterval(() => {
+    _gwSend(1, _gwSeq)
+  }, interval)
+}
+
+function _gwStopHeartbeat() {
+  if (_gwHeartbeatInt) { clearInterval(_gwHeartbeatInt); _gwHeartbeatInt = null }
+}
+
+// Handle a giveaway message: if it has a 🎉 component button, POST interaction; else PUT reaction
+async function handleGiveawayMessage(msg) {
+  if (!discordGwActive) return
+  if (_joinedGiveaways.has(msg.id)) return
+  const msgChannelId = msg.channel_id || GW_CHANNEL_ID
+
+  // Don't join ended giveaways
+  const text = (msg.content || '').toLowerCase()
+  const embedText = (msg.embeds || []).map(e => `${e.title || ''} ${e.description || ''}`).join(' ').toLowerCase()
+  if (text.includes('ended') || embedText.includes('giveaway ended') || embedText.includes('ended at')) {
+    return
+  }
+
+  _joinedGiveaways.add(msg.id)
+
+  const components = msg.components || []
+  let foundButton = false
+  for (const row of components) {
+    for (const comp of (row.components || [])) {
+      if (comp.type === 2) { // BUTTON
+        const label = (comp.label || '') + (comp.emoji ? (comp.emoji.name || '') : '')
+        // Join if not 'participants' or link buttons
+        const isActionBtn = !comp.url && comp.custom_id && !label.toLowerCase().includes('participant')
+        if (isActionBtn) {
+          foundButton = true
+          const targetGuildId = msg.guild_id || _gwGuildId || GUILD_ID
+          const res = await clickButton({
+            type: 3,
+            nonce: Date.now().toString(),
+            guild_id: targetGuildId,
+            channel_id: msgChannelId,
+            message_id: msg.id,
+            application_id: msg.application_id || msg.author?.id,
+            session_id: _gwSessionId || 'sotarium',
+            message_flags: msg.flags || 0,
+            data: {
+              component_type: 2,
+              custom_id: comp.custom_id
+            }
+          })
+          if (res.ok) {
+            sendDiscordGwLog('Successfully Joined', 'success')
+          } else {
+            // Fallback to 🎉 reaction if button interaction returned an error
+            const reacted = await putReaction(msgChannelId, msg.id, '🎉')
+            if (reacted) {
+              sendDiscordGwLog('Successfully Joined', 'success')
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // If no component button was found at all on the giveaway message, react with 🎉
+  if (!foundButton) {
+    const reacted = await putReaction(msgChannelId, msg.id, '🎉')
+    if (reacted) {
+      sendDiscordGwLog('Successfully Joined', 'success')
+    }
+  }
+}
+
+let _ticketCreatedAt = 0
+
+// Handle a win / congratulations message
+async function handleWinMessage(msg) {
+  if (!discordClaimActive) return
+  if (_claimState !== 'idle') return
+
+  const text = (msg.content || '').toLowerCase()
+  const embeds = msg.embeds || []
+  const embedText = embeds.map(e =>
+    [e.title, e.description, ...(e.fields || []).map(f => f.value), ...(e.fields || []).map(f => f.name)]
+    .filter(Boolean).join(' ')
+  ).join(' ').toLowerCase()
+  const fullText = text + ' ' + embedText
+
+  const isCongrats = fullText.includes('congratulations') || fullText.includes('won') || fullText.includes('winner')
+  if (!isCongrats) return
+
+  const username = (discordGwUsername || 'sotarium').toLowerCase().replace(/^@/, '')
+
+  const mentionedByObj = (msg.mentions || []).some(u =>
+    u.username?.toLowerCase() === username ||
+    u.global_name?.toLowerCase() === username ||
+    u.display_name?.toLowerCase() === username ||
+    u.id === _gwUserId
+  )
+
+  const mentionedByText = fullText.includes('@' + username) ||
+                          fullText.includes(username) ||
+                          (_gwUserId && fullText.includes(_gwUserId)) ||
+                          (_gwUserId && (msg.content || '').includes(`<@${_gwUserId}>`)) ||
+                          (_gwUserId && (msg.content || '').includes(`<@!${_gwUserId}>`))
+
+  if (!mentionedByObj && !mentionedByText) return
+
+  const targetGuildId = msg.guild_id || _gwGuildId || GUILD_ID
+  const msgChannelId = msg.channel_id || GW_CHANNEL_ID
+  _lastWonGwMessageLink = `https://discord.com/channels/${targetGuildId}/${msgChannelId}/${msg.id}`
+
+  sendDiscordGwLog(`Giveaway won`, 'success')
+  _claimState = 'waiting_ticket_msg'
+  _ticketCreatedAt = Date.now()
+
+  setTimeout(() => claimFlow_clickCreateTicket(), 2000)
+}
+
+async function claimFlow_clickCreateTicket() {
+  const msgs = await getMessages(TKT_PANEL_ID, 10)
+  let clicked = false
+  for (const msg of msgs) {
+    let msgChannelId = msg.channel_id
+    let targetGuildId = msg.guild_id
+
+    if (!msgChannelId || !targetGuildId) {
+      const chInfo = await getChannel(TKT_PANEL_ID)
+      if (chInfo) {
+        msgChannelId = chInfo.id || TKT_PANEL_ID
+        targetGuildId = chInfo.guild_id || _gwGuildId || GUILD_ID
+      }
+    }
+    if (!msgChannelId) msgChannelId = TKT_PANEL_ID
+    if (!targetGuildId) targetGuildId = _gwGuildId || GUILD_ID
+
+    for (const row of (msg.components || [])) {
+      for (const comp of (row.components || [])) {
+        if (comp.type === 2) {
+          const label = (comp.label || '').toLowerCase()
+          const emojiName = comp.emoji?.name || ''
+          if (label.includes('ticket') || emojiName.includes('📩') || label.includes('create') || !comp.url) {
+            const ok = await clickButton({
+              type: 3,
+              nonce: Date.now().toString(),
+              guild_id: targetGuildId,
+              channel_id: msgChannelId,
+              message_id: msg.id,
+              application_id: msg.application_id || msg.author?.id,
+              session_id: _gwSessionId || 'sotarium',
+              message_flags: msg.flags || 0,
+              data: {
+                component_type: 2,
+                custom_id: comp.custom_id
+              }
+            })
+            clicked = true
+            break
+          }
+        }
+      }
+      if (clicked) break
+    }
+    if (clicked) break
+  }
+
+  if (!clicked) {
+    setTimeout(() => claimFlow_clickCreateTicket(), 5000)
+    return
+  }
+
+  // After clicking, wait for the new ticket-XXXX channel to appear
+  setTimeout(() => claimFlow_findAndSendOne(0), 4000)
+}
+
+// Convert snowflake string to epoch ms
+function snowflakeToMs(id) {
+  try {
+    return Number((BigInt(id) >> 22n) + 1420070400000n)
+  } catch {
+    return 0
+  }
+}
+
+async function claimFlow_findAndSendOne(attempt) {
+  if (_claimState === 'claiming_done') return
+  if (attempt > 15) {
+    sendDiscordGwLog('Gave up waiting for newly created ticket channel after 75s.', 'error')
+    _claimState = 'idle'
+    return
+  }
+  const channels = await getGuildChannels()
+  
+  // Accept any text channel starting with ticket-
+  // Prefer the newest one
+  const ticketChs = channels.filter(c =>
+    c.name && /^ticket-/i.test(c.name) && (c.type === 0 || c.type === undefined)
+  ).sort((a, b) => BigInt(b.id) > BigInt(a.id) ? 1 : -1)
+
+  if (ticketChs.length === 0) {
+    setTimeout(() => claimFlow_findAndSendOne(attempt + 1), 4000)
+    return
+  }
+
+  const ticketCh = ticketChs[0]
+
+  const claimSuccess = await sendTicketClaimPayload(ticketCh.id)
+  if (claimSuccess) {
+    sendDiscordGwLog('Auto Claimed', 'success')
+    _claimState = 'claiming_done'
+  } else {
+    setTimeout(() => claimFlow_findAndSendOne(attempt + 1), 4000)
+  }
+}
+
+// Called for every MESSAGE_CREATE / MESSAGE_UPDATE from gateway
+async function onGatewayMessage(msg) {
+  if (!msg || !msg.id) return
+
+  // Auto-join giveaways in the giveaway channel
+  if (discordGwActive && msg.channel_id === GW_CHANNEL_ID) {
+    await handleGiveawayMessage(msg)
+  }
+
+  // Auto-claim: watch all channels for win messages mentioning us
+  if (discordClaimActive) {
+    await handleWinMessage(msg)
+  }
+}
+
+function connectGateway() {
+  if (_gwSocket) {
+    try { _gwSocket.terminate() } catch {}
+    _gwSocket = null
+  }
+  _gwStopHeartbeat()
+
+  sendDiscordGwLog('Connecting to Discord Gateway...', 'info')
+
+  const ws = new WebSocket('wss://gateway.discord.gg/?v=10&encoding=json')
+  _gwSocket = ws
+
+  ws.on('open', () => {
+    sendDiscordGwLog('Gateway WebSocket opened.', 'info')
+  })
+
+  ws.on('message', async raw => {
+    let payload
+    try { payload = JSON.parse(raw) } catch { return }
+
+    const { op, d, s, t } = payload
+    if (s !== null && s !== undefined) _gwSeq = s
+
+    switch (op) {
+      case 10: { // HELLO — start heartbeat and Identify
+        const interval = d.heartbeat_interval
+        sendDiscordGwLog(`Gateway HELLO — heartbeat every ${interval}ms`, 'info')
+        setTimeout(() => {
+          _gwSend(1, _gwSeq)
+          _gwStartHeartbeat(interval)
+        }, Math.random() * interval)
+
+        // Identify as a user client (not a bot — no intents, use capabilities)
+        _gwSend(2, {
+          token: _gwToken,
+          capabilities: 30717,
+          properties: {
+            os: 'Windows',
+            browser: 'Chrome',
+            device: '',
+            system_locale: 'en-US',
+            browser_user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            browser_version: '120.0.0.0',
+            os_version: '10',
+            referrer: '',
+            referring_domain: '',
+            referrer_current: '',
+            referring_domain_current: '',
+            release_channel: 'stable',
+            client_build_number: 293430,
+            client_event_source: null
+          },
+          presence: { status: 'online', since: 0, activities: [], afk: false },
+          compress: false,
+          client_state: { guild_versions: {} }
+        })
+        break
+      }
+
+      case 11: // Heartbeat ACK
+        break
+
+      case 0: { // Dispatch
+        if (t === 'READY') {
+          _gwSessionId = d.session_id
+          _gwUserId    = d.user?.id
+          _gwResumeUrl = d.resume_gateway_url
+          const uname  = d.user?.username || d.user?.global_name || 'unknown'
+          sendDiscordGwLog(`✅ Gateway READY — user: ${uname} (${_gwUserId})`, 'success')
+          sendDiscordGwLog(`Session: ${_gwSessionId}`, 'info')
+
+          // Extract guild_id automatically if available in user's guilds list
+          if (Array.isArray(d.guilds)) {
+            const matchedGuild = d.guilds.find(g => g.id === GUILD_ID)
+            if (matchedGuild) {
+              _gwGuildId = matchedGuild.id
+            } else if (d.guilds.length > 0) {
+              sendDiscordGwLog(`Note: Configured guild ${GUILD_ID} not found in ready guilds list (user has ${d.guilds.length} guilds).`, 'warn')
+            }
+          }
+
+          // Subscribe to channels so Discord sends us MESSAGE_CREATE for them (op 14 = lazy guild)
+          setTimeout(() => {
+            sendDiscordGwLog(`Subscribing to giveaway + ticket channels...`, 'info')
+            _gwSend(14, {
+              guild_id: _gwGuildId,
+              channels: {
+                [GW_CHANNEL_ID]: [[0, 99]],
+                [TKT_PANEL_ID]:  [[0, 99]]
+              }
+            })
+          }, 1500)
+
+          // Scan recent giveaway messages
+          if (discordGwActive) {
+            setTimeout(async () => {
+              sendDiscordGwLog('Scanning recent giveaway messages...', 'info')
+              const msgs = await getMessages(GW_CHANNEL_ID, 10)
+              for (const m of msgs) await handleGiveawayMessage(m)
+            }, 3000)
+          }
+        }
+
+        if (t === 'CHANNEL_CREATE') {
+          const ch = d
+          if (ch && ch.name && /^ticket-/.test(ch.name)) {
+            if (_claimState === 'waiting_ticket_msg') {
+              _claimState = 'claiming_in_progress'
+              setTimeout(async () => {
+                const claimSuccess = await sendTicketClaimPayload(ch.id)
+                if (claimSuccess) {
+                  sendDiscordGwLog('Auto Claimed', 'success')
+                  _claimState = 'claiming_done'
+                } else {
+                  _claimState = 'waiting_ticket_msg'
+                }
+              }, 1500)
+            }
+          }
+        }
+
+        if (t === 'MESSAGE_CREATE' || t === 'MESSAGE_UPDATE') {
+          await onGatewayMessage(d)
+        }
+        break
+      }
+
+      case 7: { // RECONNECT
+        sendDiscordGwLog('Gateway requested reconnect.', 'warn')
+        ws.close()
+        break
+      }
+
+      case 9: { // INVALID SESSION
+        sendDiscordGwLog('Gateway invalid session — re-identifying in 5s...', 'warn')
+        _gwSessionId = null
+        setTimeout(connectGateway, 5000)
+        break
+      }
+    }
+  })
+
+  ws.on('close', (code, reason) => {
+    _gwStopHeartbeat()
+    sendDiscordGwLog(`Gateway closed (${code}): ${reason}`, 'warn')
+    if (discordGwActive || discordClaimActive) {
+      sendDiscordGwLog('Reconnecting in 8s...', 'info')
+      setTimeout(connectGateway, 8000)
+    }
+  })
+
+  ws.on('error', err => {
+    sendDiscordGwLog(`Gateway error: ${err.message}`, 'error')
+  })
+}
+
+async function startDiscordGiveawayWatcher(token) {
+  discordGwActive = true
+
+  const cleanToken = token ? token.replace(/^(?:Bearer|Bot)\s+/i, '').replace(/^"|"$/g, '').trim() : ''
+  if (!cleanToken) {
+    sendDiscordGwLog('Cannot start: Discord token is missing. Please reconnect.', 'error')
+    return { ok: false, error: 'no_token' }
+  }
+
+  if (_gwSocket && _gwSocket.readyState === 1) {
+    sendDiscordGwLog('Gateway already connected — auto-join enabled.', 'info')
+    return { ok: true, status: 'already_running' }
+  }
+
+  _gwToken = cleanToken
+  _claimState = 'idle'
+  _joinedGiveaways.clear()
+
+  connectGateway()
+  return { ok: true, status: 'started' }
+}
+
+function stopDiscordGiveawayWatcher() {
+  discordGwActive = false
+  discordClaimActive = false
+  _gwStopHeartbeat()
+  if (_gwSocket) {
+    try { _gwSocket.terminate() } catch {}
+    _gwSocket = null
+  }
+  _claimState = 'idle'
+  sendDiscordGwLog('Stopped Discord Giveaway Bot.', 'info')
+  return { ok: true, status: 'stopped' }
+}
+
 let mainWindow = null
+
+// ─── Auto-Updater ─────────────────────────────────────────────────────────────
+const CURRENT_VERSION = app.getVersion() // from package.json
+const GITHUB_OWNER    = 'Sotarium'
+const GITHUB_REPO     = 'Cue'
+const EXE_ASSET_NAME  = 'Sotarium.exe'
+
+function httpsGetJson(url) {
+  return new Promise((resolve, reject) => {
+    const opts = new URL(url)
+    https.get({
+      hostname: opts.hostname,
+      path: opts.pathname + opts.search,
+      headers: { 'User-Agent': 'Sotarium-Updater' }
+    }, res => {
+      // Follow redirects
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        return resolve(httpsGetJson(res.headers.location))
+      }
+      let raw = ''
+      res.on('data', c => raw += c)
+      res.on('end', () => {
+        try { resolve(JSON.parse(raw)) } catch { reject(new Error('JSON parse failed')) }
+      })
+    }).on('error', reject)
+  })
+}
+
+async function fetchLatestRelease() {
+  const data = await httpsGetJson(
+    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`
+  )
+  const tag     = (data.tag_name || '').replace(/^v/, '').trim()
+  const asset   = (data.assets || []).find(a => a.name === EXE_ASSET_NAME)
+  const dlUrl   = asset?.browser_download_url || null
+  const size    = asset?.size || 0
+  return { tag, dlUrl, size }
+}
+
+function versionGt(a, b) {
+  // Returns true if version string a > b  (semver-lite)
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const na = pa[i] || 0, nb = pb[i] || 0
+    if (na > nb) return true
+    if (na < nb) return false
+  }
+  return false
+}
+
+// IPC: check whether an update is available
+ipcMain.handle('check-for-update', async () => {
+  try {
+    const { tag, dlUrl, size } = await fetchLatestRelease()
+    const updateAvailable = tag && versionGt(tag, CURRENT_VERSION)
+    return { updateAvailable, latestVersion: tag, currentVersion: CURRENT_VERSION, dlUrl, size }
+  } catch (e) {
+    return { updateAvailable: false, error: e.message }
+  }
+})
+
+// IPC: download new exe to %TEMP%, then launch it and quit
+ipcMain.handle('download-and-install-update', async () => {
+  try {
+    const { dlUrl, size } = await fetchLatestRelease()
+    if (!dlUrl) return { ok: false, error: 'No download URL found in latest release.' }
+
+    const destPath = path.join(os.tmpdir(), EXE_ASSET_NAME)
+
+    await new Promise((resolve, reject) => {
+      function doDownload(url, redirects = 0) {
+        if (redirects > 10) return reject(new Error('Too many redirects'))
+        const parsedUrl = new URL(url)
+        https.get({
+          hostname: parsedUrl.hostname,
+          path: parsedUrl.pathname + parsedUrl.search,
+          headers: { 'User-Agent': 'Sotarium-Updater' }
+        }, res => {
+          if (res.statusCode === 301 || res.statusCode === 302) {
+            return doDownload(res.headers.location, redirects + 1)
+          }
+          if (res.statusCode !== 200) {
+            return reject(new Error(`HTTP ${res.statusCode}`))
+          }
+
+          const file   = fs.createWriteStream(destPath)
+          let received = 0
+          const total  = size || parseInt(res.headers['content-length'] || '0', 10)
+
+          res.on('data', chunk => {
+            received += chunk.length
+            if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+              const percent = total > 0 ? Math.round((received / total) * 100) : -1
+              mainWindow.webContents.send('update-progress', { percent, received, total })
+            }
+          })
+
+          res.pipe(file)
+          file.on('finish', () => file.close(resolve))
+          file.on('error', reject)
+          res.on('error', reject)
+        }).on('error', reject)
+      }
+      doDownload(dlUrl)
+    })
+
+    // Launch the new exe and quit this process
+    spawn(destPath, [], {
+      detached: true,
+      stdio: 'ignore',
+      shell: false,
+    }).unref()
+
+    setTimeout(() => app.quit(), 800)
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e.message }
+  }
+})
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -491,21 +1353,14 @@ function createWindow() {
   })
 
   mainWindow.once('ready-to-show', () => {
-    try {
-      if (!mainWindow.isDestroyed()) mainWindow.show()
-    } catch (e) {}
+    mainWindow.show()
   })
 
   mainWindow.webContents.once('did-finish-load', async () => {
-    try {
-      if (mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return
-      if (process.env.SOTARIUM_SMOKE === '1') {
-        const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText').catch(() => '')
-        console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
-        app.quit()
-      }
-    } catch (e) {
-      if (!/destroyed/i.test(e.message || '')) console.log('[Sotarium] Load handler skipped:', e.message)
+    if (process.env.SOTARIUM_SMOKE === '1') {
+      const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText')
+      console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
+      app.quit()
     }
   })
 
@@ -528,19 +1383,21 @@ app.whenReady().then(() => {
     return await makeRollbuxRequest(options)
   })
 
-  // Fetch live player level directly from raw /_api/users/me: "current_level":38
+  // Fetch live player profile (level, balance, avatar) directly from raw /_api/users/me
   ipcMain.handle('fetch-level', async (_event, token) => {
     return new Promise((resolve) => {
       const trimmed = (token || '').trim()
       makeRollbuxRequest({ path: '/_api/users/me', method: 'GET', token: trimmed }).then(apiRes => {
         if (apiRes.ok) {
+          const u = apiRes.data?.data?.user || apiRes.data?.data || apiRes.data?.user || apiRes.data
           const lvl = extractLevelFromPayload(apiRes.text, apiRes.data)
-          if (lvl && lvl > 0) {
-            return resolve({ ok: true, level: lvl, badge: lvl })
-          }
+          const avatar = u?.avatar_url || u?.avatar || u?.profile_image || u?.profile_picture || u?.image_url || u?.image || u?.picture || null
+          const avatarWithTs = avatar ? (avatar.includes('?') ? `${avatar}&_ts=${Date.now()}` : `${avatar}?_ts=${Date.now()}`) : null
+          const username = u?.username || u?.name || null
+          return resolve({ ok: true, level: lvl && lvl > 0 ? lvl : null, badge: lvl, avatar: avatarWithTs, username })
         }
-        resolve({ ok: false, level: null })
-      }).catch(() => resolve({ ok: false, level: null }))
+        resolve({ ok: false, level: null, avatar: null })
+      }).catch(() => resolve({ ok: false, level: null, avatar: null }))
     })
   })
 
@@ -612,6 +1469,9 @@ app.whenReady().then(() => {
       // If user pasted a cookie string, pass it along in the Cookie header as well
       if (rawInput.includes(';') || rawInput.includes('=')) {
         headers['Cookie'] = rawInput.trim()
+        discordCookieHeader = rawInput.trim()
+      } else {
+        discordCookieHeader = ''
       }
 
       const options = {
@@ -631,6 +1491,7 @@ app.whenReady().then(() => {
             if (res.statusCode >= 200 && res.statusCode < 300 && data.id) {
               resolve({
                 ok: true,
+                token: token,
                 user: {
                   id: data.id,
                   username: data.username,
@@ -666,6 +1527,30 @@ app.whenReady().then(() => {
 
   ipcMain.handle('rain-bot-status', async () => {
     return getRainBotStatus()
+  })
+
+  // ─── Discord Giveaway IPC Handlers ───────────────────────────────────────────
+  ipcMain.handle('start-discord-gw-bot', async (_event, token) => {
+    return startDiscordGiveawayWatcher(token)
+  })
+
+  ipcMain.handle('stop-discord-gw-bot', async () => {
+    return stopDiscordGiveawayWatcher()
+  })
+
+  ipcMain.handle('set-discord-bot-flags', async (_event, { autoJoin, autoClaim, username, rollbuxUsername: rUsername }) => {
+    discordGwActive = !!autoJoin
+    discordClaimActive = !!autoClaim
+    if (username) discordGwUsername = username.trim()
+    if (rUsername) rollbuxUsername = rUsername.trim()
+    return { ok: true }
+  })
+
+  ipcMain.handle('discord-gw-status', async () => {
+    return {
+      active: discordGwActive,
+      connected: !!(_gwSocket && _gwSocket.readyState === 1)
+    }
   })
 
   // Manually trigger Turnstile solve (e.g. called from renderer when a 403 is detected)
