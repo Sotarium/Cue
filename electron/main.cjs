@@ -614,7 +614,7 @@ async function getGuildCommands(guildId, channelId) {
 }
 
 // Execute a slash command interaction like /invites (clicks top / first match)
-async function executeSlashCommand(channelId, commandName = 'invites') {
+async function executeSlashCommand(channelId, commandName = 'invites', userOptionValue = '') {
   const targetGuildId = _gwGuildId || GUILD_ID
   try {
     const commands = await getGuildCommands(targetGuildId, channelId)
@@ -623,6 +623,16 @@ async function executeSlashCommand(channelId, commandName = 'invites') {
     const cmd = matches.find(c => c.name.toLowerCase() === commandName.toLowerCase()) || matches[0]
 
     if (cmd) {
+      const optionsPayload = []
+      if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0 && userOptionValue) {
+        const targetOpt = cmd.options.find(o => /user|member/i.test(o.name)) || cmd.options[0]
+        optionsPayload.push({
+          type: targetOpt.type || 3,
+          name: targetOpt.name,
+          value: userOptionValue
+        })
+      }
+
       const payload = {
         type: 2, // APPLICATION_COMMAND
         application_id: cmd.application_id,
@@ -634,7 +644,7 @@ async function executeSlashCommand(channelId, commandName = 'invites') {
           id: cmd.id,
           name: cmd.name,
           type: cmd.type || 1,
-          options: [],
+          options: optionsPayload,
           application_command: {
             id: cmd.id,
             application_id: cmd.application_id,
@@ -681,21 +691,81 @@ async function sendTicketClaimPayload(channelId) {
   }
   await new Promise(r => setTimeout(r, 900))
 
-  // 4. The 4 proof images — upload as real file attachments (one per message, no text = embed)
-  //    Images are bundled in the app under electron/proof_images/
+  // 4. The 4 proof images — sent together in 1 SINGLE message
   const proofDir = path.join(__dirname, 'proof_images')
-  const proofFiles = ['proof1_youtube.png', 'proof2_tiktok.png', 'proof3_instagram.png', 'proof4_twitter.png']
-  for (const filename of proofFiles) {
-    const filePath = path.join(proofDir, filename)
-    if (fs.existsSync(filePath)) {
-      await sendImageAttachment(channelId, filePath)
-    }
-    await new Promise(r => setTimeout(r, 1000))
+  const proofFiles = [
+    path.join(proofDir, 'proof1_youtube.png'),
+    path.join(proofDir, 'proof2_tiktok.png'),
+    path.join(proofDir, 'proof3_instagram.png'),
+    path.join(proofDir, 'proof4_twitter.png')
+  ].filter(fp => fs.existsSync(fp))
+
+  if (proofFiles.length > 0) {
+    await sendMultipleImageAttachments(channelId, proofFiles)
   }
+  await new Promise(r => setTimeout(r, 1000))
 
   // 5. User : <rollbux user>
   await sendMessage(channelId, `User : ${userTag}`)
   return true
+}
+
+// Upload multiple image files together in 1 single Discord message
+async function sendMultipleImageAttachments(channelId, filePaths) {
+  try {
+    const boundary = '----FormBoundary' + Date.now()
+    const CRLF = '\r\n'
+
+    const metaPart = Buffer.from(
+      `--${boundary}${CRLF}` +
+      `Content-Disposition: form-data; name="payload_json"${CRLF}` +
+      `Content-Type: application/json${CRLF}${CRLF}` +
+      `{}${CRLF}`
+    )
+
+    const parts = [metaPart]
+    filePaths.forEach((fp, index) => {
+      if (fs.existsSync(fp)) {
+        const buf = fs.readFileSync(fp)
+        const filename = path.basename(fp)
+        const header = Buffer.from(
+          `--${boundary}${CRLF}` +
+          `Content-Disposition: form-data; name="files[${index}]"; filename="${filename}"${CRLF}` +
+          `Content-Type: image/png${CRLF}${CRLF}`
+        )
+        parts.push(header)
+        parts.push(buf)
+        parts.push(Buffer.from(CRLF))
+      }
+    })
+    parts.push(Buffer.from(`--${boundary}--${CRLF}`))
+    const body = Buffer.concat(parts)
+
+    return new Promise((resolve) => {
+      const opts = {
+        hostname: 'discord.com',
+        path: `/api/v10/channels/${channelId}/messages`,
+        method: 'POST',
+        headers: {
+          'Authorization': _gwToken,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': body.length
+        }
+      }
+      const req = https.request(opts, res => {
+        let raw = ''
+        res.on('data', c => raw += c)
+        res.on('end', () => resolve({ ok: res.statusCode === 200 || res.statusCode === 201, status: res.statusCode }))
+      })
+      req.on('error', e => resolve({ ok: false, error: e.message }))
+      req.write(body)
+      req.end()
+    })
+  } catch (err) {
+    console.error('[sendMultipleImageAttachments] Error:', err.message)
+    return { ok: false, error: err.message }
+  }
 }
 
 // Upload a single image file as a Discord attachment (shows as embed, not a link)
@@ -1107,11 +1177,10 @@ function connectGateway() {
             })
           }, 1500)
 
-          // Scan recent giveaway messages
+          // Scan recent giveaway messages (only unjoined and still active)
           if (discordGwActive) {
             setTimeout(async () => {
-              sendDiscordGwLog('Scanning recent giveaway messages...', 'info')
-              const msgs = await getMessages(GW_CHANNEL_ID, 10)
+              const msgs = await getMessages(GW_CHANNEL_ID, 5)
               for (const m of msgs) await handleGiveawayMessage(m)
             }, 3000)
           }
@@ -1186,7 +1255,8 @@ async function startDiscordGiveawayWatcher(token) {
 
   _gwToken = cleanToken
   _claimState = 'idle'
-  _joinedGiveaways.clear()
+  // Keep _joinedGiveaways so reconnects don't re-join or re-log old giveaways
+  // _joinedGiveaways.clear()
 
   connectGateway()
   return { ok: true, status: 'started' }

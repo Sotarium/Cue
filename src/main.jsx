@@ -1684,8 +1684,26 @@ function RollbuxDashboard({ user, onLogout }) {
                         )}
                       </div>
 
+                      {/* 24h Recap Cards Header & Clear Button */}
+                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] mt-1">
+                        <span className="text-[12px] font-semibold text-[#9aa3a8]">Giveaway Stats</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const reset = { joined: 0, won: 0, lost: 0, date: Date.now() }
+                            setGwStats(reset)
+                            window.localStorage.setItem('sotarium_gw_stats_24h', JSON.stringify(reset))
+                            setDiscordGwLogs([])
+                            showToast('Giveaway stats cleared')
+                          }}
+                          className="flex h-[24px] items-center justify-center rounded-[6px] px-[10px] bg-white/[0.06] hover:bg-[#acff46] hover:text-[#121418] text-[#9aa3a8] font-bold text-[11px] transition active:scale-95 cursor-pointer"
+                        >
+                          Clear Stats
+                        </button>
+                      </div>
+
                       {/* 24h Recap Cards */}
-                      <div className="grid grid-cols-3 gap-2.5 pt-3 border-t border-white/[0.06] mt-1">
+                      <div className="grid grid-cols-3 gap-2.5">
                         <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-white/[0.03] border border-white/[0.04]">
                           <span className="text-[11px] font-medium text-[#9aa3a8] uppercase tracking-wider">Joined</span>
                           <span className="text-[16px] font-bold text-white mt-0.5">{gwStats.joined}</span>
@@ -1713,7 +1731,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const CURRENT_APP_VERSION = '1.0.15'
+  const CURRENT_APP_VERSION = '1.0.16'
   const [showUpdate, setShowUpdate] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
