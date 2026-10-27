@@ -27,6 +27,8 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "assets/**/*",
+      "scripts/download_giveaway_assets.py",
       "package.json"
     ],
     "directories": {
