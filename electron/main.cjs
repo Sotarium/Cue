@@ -379,43 +379,61 @@ async function startRainBot(sessionToken) {
     }
   })
 
+  const botWindow = rainBotWindow
   const wc = rainBotWindow.webContents
 
   // Inject script after every navigation (SPA re-routes too)
   wc.on('did-finish-load', async () => {
-    if (wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
-    const url = wc.getURL()
-    if (url.includes('rollbux.com')) {
-      console.log('[RainBot] Page loaded:', url)
-      const injected = await injectAutoRainScript(wc)
-      if (!injected || wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
-      // Poll cookies for cf_clearance and update cache
-      const cookies = await botSes.cookies.get({ url: 'https://rollbux.com' })
-      const cf = cookies.find(c => c.name === 'cf_clearance')
-      if (cf && cf.value) {
-        cfClearanceCache = { value: cf.value, expires: Date.now() + 29 * 60 * 1000 }
+    try {
+      if (wc.isDestroyed() || botWindow.isDestroyed()) return
+      const url = wc.getURL()
+      if (url.includes('rollbux.com')) {
+        console.log('[RainBot] Page loaded:', url)
+        const injected = await injectAutoRainScript(wc)
+        if (!injected || wc.isDestroyed() || botWindow.isDestroyed()) return
+        // Poll cookies for cf_clearance and update cache
+        const cookies = await botSes.cookies.get({ url: 'https://rollbux.com' })
+        const cf = cookies.find(c => c.name === 'cf_clearance')
+        if (cf && cf.value) {
+          cfClearanceCache = { value: cf.value, expires: Date.now() + 29 * 60 * 1000 }
+        }
       }
+    } catch (e) {
+      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Load handler skipped:', e.message)
     }
   })
 
   // Also handle SPA navigation without full reload
   wc.on('did-navigate-in-page', async () => {
-    if (wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
-    await injectAutoRainScript(wc)
+    try {
+      if (wc.isDestroyed() || botWindow.isDestroyed()) return
+      await injectAutoRainScript(wc)
+    } catch (e) {
+      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Navigation handler skipped:', e.message)
+    }
   })
 
   wc.on('did-fail-load', (_e, code, desc, url) => {
-    console.log('[RainBot] Load failed:', code, desc, url)
-    // Retry after 5s if it's a network error
-    if (code !== -3) {
-      setTimeout(() => {
-        if (!wc.isDestroyed() && rainBotWindow && !rainBotWindow.isDestroyed()) wc.reload()
-      }, 5000)
+    try {
+      console.log('[RainBot] Load failed:', code, desc, url)
+      // Retry after 5s if it's a network error
+      if (code !== -3) {
+        setTimeout(() => {
+          try {
+            if (!wc.isDestroyed() && !botWindow.isDestroyed()) wc.reload()
+          } catch (e) {
+            if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Reload skipped:', e.message)
+          }
+        }, 5000)
+      }
+    } catch (e) {
+      if (!/destroyed/i.test(e.message || '')) console.log('[RainBot] Failure handler skipped:', e.message)
     }
   })
 
   rainBotWindow.on('closed', () => {
-    if (rainBotWindow && rainBotWindow.webContents === wc) rainBotWindow = null
+    try { wc.removeAllListeners() } catch (e) {}
+    if (rainBotWindow === botWindow) rainBotWindow = null
   })
 
   rainBotWindow.loadURL('https://rollbux.com', {
@@ -473,15 +491,21 @@ function createWindow() {
   })
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
+    try {
+      if (!mainWindow.isDestroyed()) mainWindow.show()
+    } catch (e) {}
   })
 
   mainWindow.webContents.once('did-finish-load', async () => {
-    if (mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return
-    if (process.env.SOTARIUM_SMOKE === '1') {
-      const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText').catch(() => '')
-      console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
-      app.quit()
+    try {
+      if (mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return
+      if (process.env.SOTARIUM_SMOKE === '1') {
+        const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText').catch(() => '')
+        console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
+        app.quit()
+      }
+    } catch (e) {
+      if (!/destroyed/i.test(e.message || '')) console.log('[Sotarium] Load handler skipped:', e.message)
     }
   })
 
