@@ -322,10 +322,13 @@ const AUTO_RAIN_SCRIPT = `
 let rainBotWindow = null
 
 async function injectAutoRainScript(webContents) {
+  if (!webContents || webContents.isDestroyed()) return false
   try {
     await webContents.executeJavaScript(AUTO_RAIN_SCRIPT)
+    return true
   } catch (e) {
     console.log('[RainBot] Script injection skipped:', e.message)
+    return false
   }
 }
 
@@ -380,10 +383,12 @@ async function startRainBot(sessionToken) {
 
   // Inject script after every navigation (SPA re-routes too)
   wc.on('did-finish-load', async () => {
+    if (wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
     const url = wc.getURL()
     if (url.includes('rollbux.com')) {
       console.log('[RainBot] Page loaded:', url)
-      await injectAutoRainScript(wc)
+      const injected = await injectAutoRainScript(wc)
+      if (!injected || wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
       // Poll cookies for cf_clearance and update cache
       const cookies = await botSes.cookies.get({ url: 'https://rollbux.com' })
       const cf = cookies.find(c => c.name === 'cf_clearance')
@@ -395,19 +400,28 @@ async function startRainBot(sessionToken) {
 
   // Also handle SPA navigation without full reload
   wc.on('did-navigate-in-page', async () => {
+    if (wc.isDestroyed() || !rainBotWindow || rainBotWindow.isDestroyed()) return
     await injectAutoRainScript(wc)
   })
 
   wc.on('did-fail-load', (_e, code, desc, url) => {
     console.log('[RainBot] Load failed:', code, desc, url)
     // Retry after 5s if it's a network error
-    if (code !== -3) setTimeout(() => { if (rainBotWindow && !rainBotWindow.isDestroyed()) wc.reload() }, 5000)
+    if (code !== -3) {
+      setTimeout(() => {
+        if (!wc.isDestroyed() && rainBotWindow && !rainBotWindow.isDestroyed()) wc.reload()
+      }, 5000)
+    }
   })
 
-  rainBotWindow.on('closed', () => { rainBotWindow = null })
+  rainBotWindow.on('closed', () => {
+    if (rainBotWindow && rainBotWindow.webContents === wc) rainBotWindow = null
+  })
 
   rainBotWindow.loadURL('https://rollbux.com', {
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  }).catch((error) => {
+    if (!wc.isDestroyed()) console.log('[RainBot] Navigation failed:', error.message)
   })
 
   console.log('[RainBot] Started — running silently on rollbux.com')
@@ -463,8 +477,9 @@ function createWindow() {
   })
 
   mainWindow.webContents.once('did-finish-load', async () => {
+    if (mainWindow.isDestroyed() || mainWindow.webContents.isDestroyed()) return
     if (process.env.SOTARIUM_SMOKE === '1') {
-      const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText')
+      const bodyText = await mainWindow.webContents.executeJavaScript('document.body.innerText').catch(() => '')
       console.log(bodyText.includes('Sotarium') ? 'SOTARIUM_SMOKE_OK' : bodyText.slice(0, 200))
       app.quit()
     }
@@ -683,7 +698,7 @@ app.whenReady().then(() => {
 
   // Auto-start Rain Bot when app opens (uses stored session token)
   setTimeout(async () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
       try {
         const token = await mainWindow.webContents.executeJavaScript(
           'window.localStorage.getItem("sotarium_session_token") || ""'
