@@ -1713,7 +1713,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const CURRENT_APP_VERSION = '1.0.5'
+  const CURRENT_APP_VERSION = '1.0.15'
   const [showUpdate, setShowUpdate] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
