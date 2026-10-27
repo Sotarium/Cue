@@ -18,6 +18,7 @@ ASSET_URLS = {
     "invite-autocomplete-example.png": "https://raw.githubusercontent.com/Sotarium/Cue/main/assets/giveaway/invite-autocomplete-example.png",
     "invite-command-example.png": "https://raw.githubusercontent.com/Sotarium/Cue/main/assets/giveaway/invite-command-example.png",
     "giveaway-image-45VlqiL.png": "https://raw.githubusercontent.com/Sotarium/Cue/main/assets/giveaway/giveaway-image-45VlqiL.png",
+    "giveaway-image-U5WCrdg.png": "https://raw.githubusercontent.com/Sotarium/Cue/main/assets/giveaway/giveaway-image-U5WCrdg.png",
 }
 
 
