@@ -1,7 +1,7 @@
 {
   "name": "sotarium-agent",
   "private": true,
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "Sotarium personal agent workspace for Windows",
   "author": "Sotarium",
   "type": "module",

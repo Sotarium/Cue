@@ -471,16 +471,8 @@ function RollbuxDashboard({ user, onLogout }) {
   }
 
   const [discordGwLogs, setDiscordGwLogs] = useState([])
-  const [gwStats, setGwStats] = useState(() => {
-    try {
-      const saved = JSON.parse(window.localStorage.getItem('sotarium_gw_stats_24h') || '{}')
-      const now = Date.now()
-      if (saved.date && (now - saved.date < 24 * 60 * 60 * 1000)) {
-        return saved
-      }
-    } catch (e) {}
-    return { joined: 0, won: 0, lost: 0, date: Date.now() }
-  })
+  // Session-based live stats: always start fresh per app execution session
+  const [gwStats, setGwStats] = useState({ joined: 0, won: 0, lost: 0, date: Date.now() })
 
   useEffect(() => {
     if (!window.electronAPI?.onDiscordGwLog) return
@@ -1731,7 +1723,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const CURRENT_APP_VERSION = '1.0.17'
+  const CURRENT_APP_VERSION = '1.0.18'
   const [showUpdate, setShowUpdate] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)

@@ -469,6 +469,7 @@ let _gwResumeUrl    = null
 let _gwSeq          = null
 // Track messages we already reacted to
 const _joinedGiveaways = new Set()
+let _botStartTime = Date.now()
 // Claim flow state
 let _claimState = 'idle'   // idle | waiting_ticket_msg | claiming_done
 
@@ -596,24 +597,32 @@ async function getGuildCommands(guildId, channelId) {
   if (_guildCommandsCache && _guildCommandsCache.length) return _guildCommandsCache
   const targetGuildId = guildId || _gwGuildId || GUILD_ID
   
-  // 1. Search in channel (type=1 and include_applications=true gives the fullest results)
-  const channelSearchPath = '/channels/' + channelId + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true'
-  const r = await discordRequest('GET', channelSearchPath)
-  console.log('[SlashCmd] Channel search status:', r.status, 'found:', r.body?.application_commands?.length || 0)
-  if (r.status === 200 && Array.isArray(r.body?.application_commands) && r.body.application_commands.length > 0) {
-    _guildCommandsCache = r.body.application_commands
-    console.log('[SlashCmd] Found commands:', _guildCommandsCache.map(c => c.name).join(', '))
-    return _guildCommandsCache
+  try {
+    // 1. Search in channel (type=1 and include_applications=true gives the fullest results)
+    const channelSearchPath = '/channels/' + channelId + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true'
+    const r = await discordRequest('GET', channelSearchPath)
+    console.log('[SlashCmd] Channel search status:', r.status, 'found:', r.body?.application_commands?.length || 0)
+    if (r.status === 200 && Array.isArray(r.body?.application_commands) && r.body.application_commands.length > 0) {
+      _guildCommandsCache = r.body.application_commands
+      console.log('[SlashCmd] Found commands:', _guildCommandsCache.map(c => c.name).join(', '))
+      return _guildCommandsCache
+    }
+  } catch (err) {
+    console.log('[SlashCmd] Channel search error:', err.message)
   }
   
-  // 2. Search in guild command index
-  const guildIndexPath = '/guilds/' + targetGuildId + '/application-command-index'
-  const rGuild = await discordRequest('GET', guildIndexPath)
-  console.log('[SlashCmd] Guild index status:', rGuild.status)
-  if (rGuild.status === 200 && Array.isArray(rGuild.body?.application_commands) && rGuild.body.application_commands.length > 0) {
-    _guildCommandsCache = rGuild.body.application_commands
-    console.log('[SlashCmd] Guild index invite commands:', _guildCommandsCache.filter(c => /invite/i.test(c.name)).map(c => c.name).join(', '))
-    return _guildCommandsCache
+  try {
+    // 2. Search in guild command index
+    const guildIndexPath = '/guilds/' + targetGuildId + '/application-command-index'
+    const rGuild = await discordRequest('GET', guildIndexPath)
+    console.log('[SlashCmd] Guild index status:', rGuild.status)
+    if (rGuild.status === 200 && Array.isArray(rGuild.body?.application_commands) && rGuild.body.application_commands.length > 0) {
+      _guildCommandsCache = rGuild.body.application_commands
+      console.log('[SlashCmd] Guild index invite commands:', _guildCommandsCache.filter(c => /invite/i.test(c.name)).map(c => c.name).join(', '))
+      return _guildCommandsCache
+    }
+  } catch (err) {
+    console.log('[SlashCmd] Guild index error:', err.message)
   }
 
   return []
@@ -858,6 +867,7 @@ async function sendImageAttachment(channelId, filePath) {
 // POST /interactions  (click a component button)
 async function clickButton(payload) {
   const r = await discordRequest('POST', '/interactions', payload)
+  console.log('[Interactions] POST status:', r.status, 'body:', JSON.stringify(r.body || ''))
   return { ok: r.status === 204 || r.status === 200, status: r.status, body: r.body }
 }
 
@@ -905,6 +915,14 @@ function _gwStopHeartbeat() {
 async function handleGiveawayMessage(msg) {
   if (!discordGwActive) return
   if (_joinedGiveaways.has(msg.id)) return
+
+  // Do not process or count giveaways created before the bot was started / executed
+  const msgTime = (msg.timestamp ? new Date(msg.timestamp).getTime() : 0) || snowflakeToMs(msg.id)
+  if (msgTime > 0 && msgTime < (_botStartTime - 10000)) {
+    _joinedGiveaways.add(msg.id)
+    return
+  }
+
   const msgChannelId = msg.channel_id || GW_CHANNEL_ID
 
   // Don't join ended giveaways
@@ -970,6 +988,12 @@ let _ticketCreatedAt = 0
 async function handleWinMessage(msg) {
   if (!discordClaimActive) return
   if (_claimState !== 'idle') return
+
+  // Do not process or count wins that occurred before app execution
+  const msgTime = (msg.timestamp ? new Date(msg.timestamp).getTime() : 0) || snowflakeToMs(msg.id)
+  if (msgTime > 0 && msgTime < (_botStartTime - 10000)) {
+    return
+  }
 
   const text = (msg.content || '').toLowerCase()
   const embeds = msg.embeds || []
