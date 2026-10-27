@@ -1,19 +1,20 @@
 # Giveaway assets
 
 These are the supplied Discord screenshots used as giveaway/command references.
-They are intentionally kept as original PNG files so the agent can fetch them
-from the repository or use the sender script without relying on a local folder.
+They are intentionally kept as original PNG files so Cue can fetch them into
+its own workspace without relying on a folder on the user's computer.
 
-## Send as real Discord attachments
+## Prepare files for Cue's browser upload
 
-From the repository root:
+The Giveaway Boat channel does not need to be owned by you, so a webhook is
+not appropriate. Cue can download these public files into its own workspace,
+then upload them through the already-authenticated Discord browser session:
 
 ```bash
-export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/…'
-python3 scripts/send_giveaway_assets.py assets/giveaway/*.png
+python3 scripts/download_giveaway_assets.py
 ```
 
-The script uploads the files as multipart attachments and references them with
-`attachment://filename`, which makes Discord render them in the embed. It does
-not store or print the webhook URL. Use `--dry-run` to inspect the payload
-without sending anything.
+The default output is `/tmp/cue-giveaway-assets/`. Cue must then use Discord's
+actual file-upload control with those local paths, wait for the upload preview,
+and send the message. Typing a filename or URL into the message box will not
+create an attachment.
