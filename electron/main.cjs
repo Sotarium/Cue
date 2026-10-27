@@ -596,24 +596,29 @@ async function getGuildCommands(guildId, channelId) {
   if (_guildCommandsCache && _guildCommandsCache.length) return _guildCommandsCache
   const targetGuildId = guildId || _gwGuildId || GUILD_ID
   
-  // 1. Search in channel
-  const r = await discordRequest('GET', `/channels/${channelId}/application-commands/search?query=invites&limit=10`)
+  // 1. Search in channel (type=1 and include_applications=true gives the fullest results)
+  const channelSearchPath = '/channels/' + channelId + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true'
+  const r = await discordRequest('GET', channelSearchPath)
+  console.log('[SlashCmd] Channel search status:', r.status, 'found:', r.body?.application_commands?.length || 0)
   if (r.status === 200 && Array.isArray(r.body?.application_commands) && r.body.application_commands.length > 0) {
     _guildCommandsCache = r.body.application_commands
+    console.log('[SlashCmd] Found commands:', _guildCommandsCache.map(c => c.name).join(', '))
     return _guildCommandsCache
   }
   
   // 2. Search in guild command index
-  const rGuild = await discordRequest('GET', `/guilds/${targetGuildId}/application-command-index`)
+  const guildIndexPath = '/guilds/' + targetGuildId + '/application-command-index'
+  const rGuild = await discordRequest('GET', guildIndexPath)
+  console.log('[SlashCmd] Guild index status:', rGuild.status)
   if (rGuild.status === 200 && Array.isArray(rGuild.body?.application_commands) && rGuild.body.application_commands.length > 0) {
     _guildCommandsCache = rGuild.body.application_commands
+    console.log('[SlashCmd] Guild index invite commands:', _guildCommandsCache.filter(c => /invite/i.test(c.name)).map(c => c.name).join(', '))
     return _guildCommandsCache
   }
 
   return []
 }
 
-// Execute a slash command interaction like /invites (clicks top / first match)
 async function executeSlashCommand(channelId, commandName = 'invites', userOptionValue = '') {
   const targetGuildId = _gwGuildId || GUILD_ID
   try {
@@ -624,12 +629,37 @@ async function executeSlashCommand(channelId, commandName = 'invites', userOptio
 
     if (cmd) {
       const optionsPayload = []
-      if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0 && userOptionValue) {
+      let resolvedData = {}
+
+      if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0 && (userOptionValue || _gwUserId)) {
         const targetOpt = cmd.options.find(o => /user|member/i.test(o.name)) || cmd.options[0]
+        const optType = targetOpt.type || 3
+
+        // USER type (6) or MENTIONABLE (9) require a snowflake ID, not a username string
+        let optValue = userOptionValue
+        if (optType === 6 || optType === 9) {
+          // Use the gateway user ID (snowflake) — this is what Discord requires for USER options
+          optValue = _gwUserId || userOptionValue
+          // Build resolved.users so Discord knows who this ID refers to
+          if (_gwUserId) {
+            resolvedData = {
+              users: {
+                [_gwUserId]: {
+                  id: _gwUserId,
+                  username: (discordGwUsername || userOptionValue || '').replace(/^@/, ''),
+                  discriminator: '0',
+                  avatar: null
+                }
+              },
+              members: {}
+            }
+          }
+        }
+
         optionsPayload.push({
-          type: targetOpt.type || 3,
+          type: optType,
           name: targetOpt.name,
-          value: userOptionValue
+          value: optValue
         })
       }
 
@@ -645,25 +675,32 @@ async function executeSlashCommand(channelId, commandName = 'invites', userOptio
           name: cmd.name,
           type: cmd.type || 1,
           options: optionsPayload,
+          resolved: resolvedData,
           application_command: {
             id: cmd.id,
             application_id: cmd.application_id,
             version: cmd.version,
             default_member_permissions: cmd.default_member_permissions || null,
             type: cmd.type || 1,
+            nsfw: false,
             name: cmd.name,
             description: cmd.description || '',
-            dm_permission: true
+            dm_permission: true,
+            contexts: null,
+            options: cmd.options || []
           },
           attachments: []
         },
         nonce: Date.now().toString()
       }
       const res = await clickButton(payload)
+      sendDiscordGwLog('[/invites] interaction status: ' + res.status + ' ok:' + res.ok, 'info')
       if (res.ok) return true
+    } else {
+      sendDiscordGwLog('[/invites] command not found in guild commands list, falling back to text', 'warn')
     }
   } catch (e) {
-    // ignore
+    sendDiscordGwLog('[/invites] executeSlashCommand error: ' + e.message, 'warn')
   }
 
   return false
@@ -714,7 +751,7 @@ async function sendTicketClaimPayload(channelId) {
 async function sendMultipleImageAttachments(channelId, filePaths) {
   try {
     const boundary = '----FormBoundary' + Date.now()
-    const CRLF = '\r\n'
+    const CRLF = '\n'
 
     const metaPart = Buffer.from(
       `--${boundary}${CRLF}` +
@@ -774,7 +811,7 @@ async function sendImageAttachment(channelId, filePath) {
     const buf = fs.readFileSync(filePath)
     const filename = path.basename(filePath)
     const boundary = '----FormBoundary' + Date.now()
-    const CRLF = '\r\n'
+    const CRLF = '\n'
 
     // Build multipart body manually so we don't need extra deps
     const metaPart = Buffer.from(
@@ -1438,7 +1475,7 @@ function createWindow() {
 }
 
 app.on('second-instance', () => {
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   }
