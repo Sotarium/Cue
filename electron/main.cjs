@@ -961,27 +961,12 @@ async function handleGiveawayMessage(msg) {
           })
           if (res.ok) {
             sendDiscordGwLog('Successfully Joined', 'success')
-          } else {
-            // Fallback to 🎉 reaction if button interaction returned an error
-            const reacted = await putReaction(msgChannelId, msg.id, '🎉')
-            if (reacted) {
-              sendDiscordGwLog('Successfully Joined', 'success')
-            }
           }
         }
       }
     }
   }
-
-  // If no component button was found at all on the giveaway message, react with 🎉
-  if (!foundButton) {
-    const reacted = await putReaction(msgChannelId, msg.id, '🎉')
-    if (reacted) {
-      sendDiscordGwLog('Successfully Joined', 'success')
-    }
-  }
 }
-
 let _ticketCreatedAt = 0
 
 // Handle a win / congratulations message

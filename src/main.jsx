@@ -1694,19 +1694,11 @@ function RollbuxDashboard({ user, onLogout }) {
                         </button>
                       </div>
 
-                      {/* 24h Recap Cards */}
-                      <div className="grid grid-cols-3 gap-2.5">
-                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-white/[0.03] border border-white/[0.04]">
+                      {/* Giveaway Stats Card */}
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <div className="flex flex-col items-center justify-center py-2.5 px-4 rounded-[10px] bg-white/[0.03] border border-white/[0.04]">
                           <span className="text-[11px] font-medium text-[#9aa3a8] uppercase tracking-wider">Joined</span>
-                          <span className="text-[16px] font-bold text-white mt-0.5">{gwStats.joined}</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-[#acff46]/[0.04] border border-[#acff46]/10">
-                          <span className="text-[11px] font-medium text-[#acff46] uppercase tracking-wider">Won</span>
-                          <span className="text-[16px] font-bold text-[#acff46] mt-0.5">{gwStats.won}</span>
-                        </div>
-                        <div className="flex flex-col items-center justify-center py-2 px-3 rounded-[10px] bg-red-500/[0.04] border border-red-500/10">
-                          <span className="text-[11px] font-medium text-red-400 uppercase tracking-wider">Lost</span>
-                          <span className="text-[16px] font-bold text-red-400 mt-0.5">{gwStats.lost}</span>
+                          <span className="text-[18px] font-bold text-white mt-0.5">{gwStats.joined}</span>
                         </div>
                       </div>
                     </div>
@@ -1723,7 +1715,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const CURRENT_APP_VERSION = '1.0.18'
+  const CURRENT_APP_VERSION = '1.0.19'
   const [showUpdate, setShowUpdate] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
