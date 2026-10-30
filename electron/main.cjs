@@ -589,50 +589,64 @@ async function sendMessageWithAttachments(channelId, content, filePaths = []) {
   }
 }
 
-// Cache for found slash commands
+// Cache for found slash commands (never cache empty results)
 let _guildCommandsCache = null
 
 // Fetch guild application commands (slash commands)
+// Tries ticket channelId AND GW_CHANNEL_ID to maximize slash command discovery
 async function getGuildCommands(guildId, channelId) {
   if (_guildCommandsCache && _guildCommandsCache.length) return _guildCommandsCache
   const targetGuildId = guildId || _gwGuildId || GUILD_ID
-  
-  try {
-    // 1. Search in channel (type=1 and include_applications=true gives the fullest results)
-    const channelSearchPath = '/channels/' + channelId + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true'
-    const r = await discordRequest('GET', channelSearchPath)
-    console.log('[SlashCmd] Channel search status:', r.status, 'found:', r.body?.application_commands?.length || 0)
-    if (r.status === 200 && Array.isArray(r.body?.application_commands) && r.body.application_commands.length > 0) {
-      _guildCommandsCache = r.body.application_commands
-      console.log('[SlashCmd] Found commands:', _guildCommandsCache.map(c => c.name).join(', '))
-      return _guildCommandsCache
-    }
-  } catch (err) {
-    console.log('[SlashCmd] Channel search error:', err.message)
-  }
-  
-  try {
-    // 2. Search in guild command index
-    const guildIndexPath = '/guilds/' + targetGuildId + '/application-command-index'
-    const rGuild = await discordRequest('GET', guildIndexPath)
-    console.log('[SlashCmd] Guild index status:', rGuild.status)
-    if (rGuild.status === 200 && Array.isArray(rGuild.body?.application_commands) && rGuild.body.application_commands.length > 0) {
-      _guildCommandsCache = rGuild.body.application_commands
-      console.log('[SlashCmd] Guild index invite commands:', _guildCommandsCache.filter(c => /invite/i.test(c.name)).map(c => c.name).join(', '))
-      return _guildCommandsCache
-    }
-  } catch (err) {
-    console.log('[SlashCmd] Guild index error:', err.message)
+
+  // Try both the provided channel AND the GW channel
+  const channelIds = []
+  if (channelId) channelIds.push(channelId)
+  if (GW_CHANNEL_ID && GW_CHANNEL_ID !== channelId) channelIds.push(GW_CHANNEL_ID)
+
+  for (const cid of channelIds) {
+    try {
+      // Search with 'invites' query
+      const r = await discordRequest('GET', '/channels/' + cid + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true')
+      console.log('[SlashCmd] Channel', cid, 'query search:', r.status, 'found:', r.body && r.body.application_commands ? r.body.application_commands.length : 0)
+      if (r.status === 200 && Array.isArray(r.body && r.body.application_commands) && r.body.application_commands.length > 0) {
+        _guildCommandsCache = r.body.application_commands
+        console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
+        return _guildCommandsCache
+      }
+    } catch (err) {}
+
+    try {
+      // Search without query (returns all slash commands in channel)
+      const r = await discordRequest('GET', '/channels/' + cid + '/application-commands/search?type=1&limit=50&include_applications=true')
+      console.log('[SlashCmd] Channel', cid, 'all-cmd search:', r.status, 'found:', r.body && r.body.application_commands ? r.body.application_commands.length : 0)
+      if (r.status === 200 && Array.isArray(r.body && r.body.application_commands) && r.body.application_commands.length > 0) {
+        _guildCommandsCache = r.body.application_commands
+        console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
+        return _guildCommandsCache
+      }
+    } catch (err) {}
   }
 
+  try {
+    // Guild command index fallback
+    const rGuild = await discordRequest('GET', '/guilds/' + targetGuildId + '/application-command-index')
+    console.log('[SlashCmd] Guild index:', rGuild.status, 'found:', rGuild.body && rGuild.body.application_commands ? rGuild.body.application_commands.length : 0)
+    if (rGuild.status === 200 && Array.isArray(rGuild.body && rGuild.body.application_commands) && rGuild.body.application_commands.length > 0) {
+      _guildCommandsCache = rGuild.body.application_commands
+      console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
+      return _guildCommandsCache
+    }
+  } catch (err) {}
+
+  console.log('[SlashCmd] No commands found via any search method')
   return []
 }
 
 async function executeSlashCommand(channelId, commandName = 'invites', userOptionValue = '') {
   const targetGuildId = _gwGuildId || GUILD_ID
   try {
+    console.log('[SlashCmd] Searching for command:', commandName, 'in channel:', channelId)
     const commands = await getGuildCommands(targetGuildId, channelId)
-    // Filter matching commands and pick the top one (matching the UI dropdown selection)
     const matches = commands.filter(c => c.name && c.name.toLowerCase().startsWith(commandName.toLowerCase()))
     const cmd = matches.find(c => c.name.toLowerCase() === commandName.toLowerCase()) || matches[0]
 
@@ -640,36 +654,38 @@ async function executeSlashCommand(channelId, commandName = 'invites', userOptio
       const optionsPayload = []
       let resolvedData = {}
 
-      if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0 && (userOptionValue || _gwUserId)) {
+      if (cmd.options && Array.isArray(cmd.options) && cmd.options.length > 0) {
         const targetOpt = cmd.options.find(o => /user|member/i.test(o.name)) || cmd.options[0]
-        const optType = targetOpt.type || 3
+        const optType = targetOpt.type || 6 // USER option is type 6
+        const optValue = _gwUserId || userOptionValue || '1156828590302453831'
 
-        // USER type (6) or MENTIONABLE (9) require a snowflake ID, not a username string
-        let optValue = userOptionValue
-        if (optType === 6 || optType === 9) {
-          // Use the gateway user ID (snowflake) — this is what Discord requires for USER options
-          optValue = _gwUserId || userOptionValue
-          // Build resolved.users so Discord knows who this ID refers to
-          if (_gwUserId) {
-            resolvedData = {
-              users: {
-                [_gwUserId]: {
-                  id: _gwUserId,
-                  username: (discordGwUsername || userOptionValue || '').replace(/^@/, ''),
-                  discriminator: '0',
-                  avatar: null
-                }
-              },
-              members: {}
-            }
-          }
-        }
-
+        // Pass selected matching user from the pop-up list into options and resolved
         optionsPayload.push({
           type: optType,
           name: targetOpt.name,
           value: optValue
         })
+
+        if (_gwUserId) {
+          resolvedData = {
+            users: {
+              [_gwUserId]: {
+                id: _gwUserId,
+                username: (discordGwUsername || userOptionValue || 'sotarium').replace(/^@/, ''),
+                discriminator: '0',
+                avatar: null
+              }
+            },
+            members: {
+              [_gwUserId]: {
+                roles: [],
+                joined_at: new Date().toISOString(),
+                deaf: false,
+                mute: false
+              }
+            }
+          }
+        }
       }
 
       const payload = {
@@ -703,20 +719,16 @@ async function executeSlashCommand(channelId, commandName = 'invites', userOptio
         nonce: Date.now().toString()
       }
       const res = await clickButton(payload)
-      sendDiscordGwLog('[/invites] interaction status: ' + res.status + ' ok:' + res.ok, 'info')
-      if (res.ok) return true
-    } else {
-      sendDiscordGwLog('[/invites] command not found in guild commands list, falling back to text', 'warn')
+      return res.ok
     }
-  } catch (e) {
-    sendDiscordGwLog('[/invites] executeSlashCommand error: ' + e.message, 'warn')
-  }
+  } catch (e) {}
 
   return false
 }
 
 // Helper: send claim payload into ticket channel (gw link, g.m, /invites, 4 proof images, User : ...)
 async function sendTicketClaimPayload(channelId) {
+  _guildCommandsCache = null // Always refresh slash cmd cache for each claim
   const targetGuildId = _gwGuildId || GUILD_ID
   const gwLink = _lastWonGwMessageLink || `https://discord.com/channels/${targetGuildId}/${GW_CHANNEL_ID}`
   const userTag = rollbuxUsername || discordGwUsername || 'sotarium'
@@ -1646,6 +1658,65 @@ app.whenReady().then(() => {
   })
 
   // ─── Discord Giveaway IPC Handlers ───────────────────────────────────────────
+  
+// --- Discord Live Window ---
+let discordTabWindow = null
+
+function openDiscordLiveWindow(token) {
+  if (discordTabWindow && !discordTabWindow.isDestroyed()) {
+    discordTabWindow.show()
+    discordTabWindow.focus()
+    return { ok: true }
+  }
+
+  const dsSes = session.fromPartition('persist:discord-live-session')
+
+  discordTabWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    show: true,
+    title: 'Sotarium — Discord Live View',
+    webPreferences: {
+      session: dsSes,
+      contextIsolation: false,
+      nodeIntegration: false,
+    }
+  })
+
+  discordTabWindow.on('closed', () => { discordTabWindow = null })
+
+  const cleanTok = (token || _gwToken || '').replace(/^(?:Bearer|Bot)\s+/i, '').trim()
+
+  discordTabWindow.webContents.on('dom-ready', async () => {
+    if (!discordTabWindow || discordTabWindow.isDestroyed()) return
+    if (cleanTok) {
+      try {
+        await discordTabWindow.webContents.executeJavaScript(`
+          (function() {
+            try {
+              const t = ${JSON.stringify(cleanTok)};
+              if (t && !window.localStorage.getItem('token')) {
+                window.localStorage.setItem('token', '"' + t + '"');
+                window.location.reload();
+              }
+            } catch(e) {}
+          })();
+        `)
+      } catch (err) {}
+    }
+  })
+
+  const targetGuild = _gwGuildId || GUILD_ID
+  const targetChannel = GW_CHANNEL_ID ? `https://discord.com/channels/${targetGuild}/${GW_CHANNEL_ID}` : 'https://discord.com/app'
+  discordTabWindow.loadURL(targetChannel, {
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  })
+
+  return { ok: true }
+}
+
+  ipcMain.handle('open-discord-window', async (_event, token) => { return openDiscordLiveWindow(token) })
+
   ipcMain.handle('start-discord-gw-bot', async (_event, token) => {
     return startDiscordGiveawayWatcher(token)
   })

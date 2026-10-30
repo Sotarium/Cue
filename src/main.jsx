@@ -479,17 +479,7 @@ function RollbuxDashboard({ user, onLogout }) {
     const cleanup = window.electronAPI.onDiscordGwLog((log) => {
       setDiscordGwLogs((prev) => [log, ...prev].slice(0, 15))
       if (log.message === 'Successfully Joined') {
-        setGwStats(prev => {
-          const next = { ...prev, joined: prev.joined + 1, lost: Math.max(0, (prev.joined + 1) - prev.won) }
-          window.localStorage.setItem('sotarium_gw_stats_24h', JSON.stringify(next))
-          return next
-        })
-      } else if (log.message === 'Giveaway won') {
-        setGwStats(prev => {
-          const next = { ...prev, won: prev.won + 1, lost: Math.max(0, prev.joined - (prev.won + 1)) }
-          window.localStorage.setItem('sotarium_gw_stats_24h', JSON.stringify(next))
-          return next
-        })
+        setGwStats(prev => ({ ...prev, joined: prev.joined + 1 }))
       }
     })
     return cleanup
@@ -1659,7 +1649,20 @@ function RollbuxDashboard({ user, onLogout }) {
                           <span className="h-2 w-2 rounded-full bg-[#acff46] animate-pulse"></span>
                           <span className="text-[14px] font-bold text-white">Giveaway Bot Logs</span>
                         </div>
-                        <span className="text-[12px] text-[#9aa3a8]">Listening to channel #1564378251575562300</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] text-[#9aa3a8]">Listening to channel #1564378251575562300</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.electronAPI?.openDiscordWindow) {
+                                window.electronAPI.openDiscordWindow(discordToken)
+                              }
+                            }}
+                            className="flex h-[24px] items-center justify-center rounded-[6px] px-[10px] bg-[#5865F2]/20 hover:bg-[#5865F2] hover:text-white text-[#5865F2] font-bold text-[11px] transition active:scale-95 cursor-pointer"
+                          >
+                            Open Discord Tab
+                          </button>
+                        </div>
                       </div>
                       <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
                         {discordGwLogs.length === 0 ? (
@@ -1715,7 +1718,7 @@ function RollbuxDashboard({ user, onLogout }) {
 }
 
 function DesktopApp() {
-  const CURRENT_APP_VERSION = '1.0.20'
+  const CURRENT_APP_VERSION = '1.0.23'
   const [showUpdate, setShowUpdate] = useState(false)
   const [latestVersion, setLatestVersion] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
