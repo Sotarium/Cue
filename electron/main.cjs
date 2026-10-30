@@ -475,10 +475,6 @@ let _claimState = 'idle'   // idle | waiting_ticket_msg | claiming_done
 
 function sendDiscordGwLog(message, type = 'info') {
   console.log(`[DiscordGW] ${message}`)
-  const allowedExact = ['Successfully Joined', 'Giveaway won', 'Auto Claimed']
-  if (!allowedExact.includes(message)) {
-    return
-  }
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
     mainWindow.webContents.send('discord-gw-log', { message, type, time: new Date().toLocaleTimeString() })
   }
@@ -1031,47 +1027,55 @@ async function handleWinMessage(msg) {
   setTimeout(() => claimFlow_clickCreateTicket(), 2000)
 }
 
-async function claimFlow_clickCreateTicket() {
-  const msgs = await getMessages(TKT_PANEL_ID, 10)
-  let clicked = false
-  for (const msg of msgs) {
-    let msgChannelId = msg.channel_id
-    let targetGuildId = msg.guild_id
+async function claimFlow_clickCreateTicket(retryCount = 0) {
+  sendDiscordGwLog('Creating claim ticket...', 'info')
+  const targetGuildId = _gwGuildId || GUILD_ID
 
-    if (!msgChannelId || !targetGuildId) {
-      const chInfo = await getChannel(TKT_PANEL_ID)
-      if (chInfo) {
-        msgChannelId = chInfo.id || TKT_PANEL_ID
-        targetGuildId = chInfo.guild_id || _gwGuildId || GUILD_ID
-      }
+  // Channels to inspect for ticket creation button: TKT_PANEL_ID, GW_CHANNEL_ID, or any ticket/claim channel
+  const candidateChannels = [TKT_PANEL_ID, GW_CHANNEL_ID]
+  try {
+    const allChannels = await getGuildChannels(targetGuildId)
+    const panelCh = allChannels.find(c => /ticket|claim|panel/i.test(c.name))
+    if (panelCh && !candidateChannels.includes(panelCh.id)) {
+      candidateChannels.push(panelCh.id)
     }
-    if (!msgChannelId) msgChannelId = TKT_PANEL_ID
-    if (!targetGuildId) targetGuildId = _gwGuildId || GUILD_ID
+  } catch (e) {}
 
-    for (const row of (msg.components || [])) {
-      for (const comp of (row.components || [])) {
-        if (comp.type === 2) {
-          const label = (comp.label || '').toLowerCase()
-          const emojiName = comp.emoji?.name || ''
-          if (label.includes('ticket') || emojiName.includes('📩') || label.includes('create') || !comp.url) {
-            const ok = await clickButton({
-              type: 3,
-              nonce: Date.now().toString(),
-              guild_id: targetGuildId,
-              channel_id: msgChannelId,
-              message_id: msg.id,
-              application_id: msg.application_id || msg.author?.id,
-              session_id: _gwSessionId || 'sotarium',
-              message_flags: msg.flags || 0,
-              data: {
-                component_type: 2,
-                custom_id: comp.custom_id
+  let clicked = false
+  for (const cid of candidateChannels) {
+    if (!cid) continue
+    const msgs = await getMessages(cid, 10)
+    for (const msg of msgs) {
+      const msgChannelId = msg.channel_id || cid
+      for (const row of (msg.components || [])) {
+        for (const comp of (row.components || [])) {
+          if (comp.type === 2) {
+            const label = (comp.label || '').toLowerCase()
+            const emojiName = comp.emoji?.name || ''
+            if (label.includes('ticket') || emojiName.includes('📩') || label.includes('claim') || label.includes('create') || !comp.url) {
+              const res = await clickButton({
+                type: 3,
+                nonce: Date.now().toString(),
+                guild_id: targetGuildId,
+                channel_id: msgChannelId,
+                message_id: msg.id,
+                application_id: msg.application_id || msg.author?.id,
+                session_id: _gwSessionId || 'sotarium',
+                message_flags: msg.flags || 0,
+                data: {
+                  component_type: 2,
+                  custom_id: comp.custom_id
+                }
+              })
+              if (res.ok) {
+                clicked = true
+                sendDiscordGwLog('Clicked Create Ticket button', 'info')
+                break
               }
-            })
-            clicked = true
-            break
+            }
           }
         }
+        if (clicked) break
       }
       if (clicked) break
     }
@@ -1079,12 +1083,17 @@ async function claimFlow_clickCreateTicket() {
   }
 
   if (!clicked) {
-    setTimeout(() => claimFlow_clickCreateTicket(), 5000)
+    if (retryCount < 5) {
+      setTimeout(() => claimFlow_clickCreateTicket(retryCount + 1), 4000)
+    } else {
+      sendDiscordGwLog('Could not find Create Ticket button in panel', 'warn')
+      setTimeout(() => claimFlow_findAndSendOne(0), 2000)
+    }
     return
   }
 
-  // After clicking, wait for the new ticket-XXXX channel to appear
-  setTimeout(() => claimFlow_findAndSendOne(0), 4000)
+  // After clicking, poll for newly created ticket channel
+  setTimeout(() => claimFlow_findAndSendOne(0), 3000)
 }
 
 // Convert snowflake string to epoch ms
@@ -1099,24 +1108,27 @@ function snowflakeToMs(id) {
 async function claimFlow_findAndSendOne(attempt) {
   if (_claimState === 'claiming_done') return
   if (attempt > 15) {
-    sendDiscordGwLog('Gave up waiting for newly created ticket channel after 75s.', 'error')
+    sendDiscordGwLog('Gave up waiting for ticket channel after 60s.', 'warn')
     _claimState = 'idle'
     return
   }
   const channels = await getGuildChannels()
   
-  // Accept any text channel starting with ticket-
-  // Prefer the newest one
-  const ticketChs = channels.filter(c =>
-    c.name && /^ticket-/i.test(c.name) && (c.type === 0 || c.type === undefined)
-  ).sort((a, b) => BigInt(b.id) > BigInt(a.id) ? 1 : -1)
+  // Accept any text/thread channel starting with ticket- or containing username
+  const username = (discordGwUsername || 'sotarium').toLowerCase().replace(/^@/, '')
+  const ticketChs = channels.filter(c => {
+    if (!c.name) return false
+    const n = c.name.toLowerCase()
+    return n.startsWith('ticket-') || n.includes('claim') || n.includes(username)
+  }).sort((a, b) => (BigInt(b.id) > BigInt(a.id) ? 1 : -1))
 
   if (ticketChs.length === 0) {
-    setTimeout(() => claimFlow_findAndSendOne(attempt + 1), 4000)
+    setTimeout(() => claimFlow_findAndSendOne(attempt + 1), 3500)
     return
   }
 
   const ticketCh = ticketChs[0]
+  sendDiscordGwLog(`Sending claim to ticket #${ticketCh.name}...`, 'info')
 
   const claimSuccess = await sendTicketClaimPayload(ticketCh.id)
   if (claimSuccess) {
@@ -1244,11 +1256,13 @@ function connectGateway() {
           }
         }
 
-        if (t === 'CHANNEL_CREATE') {
+        if (t === 'CHANNEL_CREATE' || t === 'THREAD_CREATE') {
           const ch = d
-          if (ch && ch.name && /^ticket-/.test(ch.name)) {
+          console.log(`[DiscordGW] Channel/Thread created: ${ch?.name} (${ch?.id})`)
+          if (ch && ch.name && (/ticket-/i.test(ch.name) || /claim/i.test(ch.name))) {
             if (_claimState === 'waiting_ticket_msg') {
               _claimState = 'claiming_in_progress'
+              sendDiscordGwLog(`Ticket channel created: #${ch.name}`, 'info')
               setTimeout(async () => {
                 const claimSuccess = await sendTicketClaimPayload(ch.id)
                 if (claimSuccess) {
@@ -1670,23 +1684,24 @@ function openDiscordLiveWindow(token) {
   }
 
   const dsSes = session.fromPartition('persist:discord-live-session')
+  const cleanTok = (token || _gwToken || '').replace(/^(?:Bearer|Bot)\s+/i, '').replace(/^"|"$/g, '').trim()
 
   discordTabWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1280,
+    height: 840,
     show: true,
     title: 'Sotarium — Discord Live View',
     webPreferences: {
       session: dsSes,
       contextIsolation: false,
       nodeIntegration: false,
+      webSecurity: false
     }
   })
 
   discordTabWindow.on('closed', () => { discordTabWindow = null })
 
-  const cleanTok = (token || _gwToken || '').replace(/^(?:Bearer|Bot)\s+/i, '').trim()
-
+  // Discord web token injector
   discordTabWindow.webContents.on('dom-ready', async () => {
     if (!discordTabWindow || discordTabWindow.isDestroyed()) return
     if (cleanTok) {
@@ -1694,10 +1709,12 @@ function openDiscordLiveWindow(token) {
         await discordTabWindow.webContents.executeJavaScript(`
           (function() {
             try {
-              const t = ${JSON.stringify(cleanTok)};
-              if (t && !window.localStorage.getItem('token')) {
-                window.localStorage.setItem('token', '"' + t + '"');
-                window.location.reload();
+              const tok = ${JSON.stringify(cleanTok)};
+              const cur = window.localStorage.getItem('token');
+              if (tok && (!cur || cur !== '"' + tok + '"')) {
+                window.localStorage.setItem('token', '"' + tok + '"');
+                window.sessionStorage.setItem('token', '"' + tok + '"');
+                setTimeout(() => window.location.reload(), 150);
               }
             } catch(e) {}
           })();
