@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   rainBotStatus: () => ipcRenderer.invoke('rain-bot-status'),
   discordGetUser: (token) => ipcRenderer.invoke('discord-get-user', token),
   startDiscordGiveawayBot: (token) => ipcRenderer.invoke('start-discord-gw-bot', token),
+  openDiscordWindow: (token) => ipcRenderer.invoke('open-discord-window', token),
   stopDiscordGiveawayBot: () => ipcRenderer.invoke('stop-discord-gw-bot'),
   setDiscordBotFlags: (flags) => ipcRenderer.invoke('set-discord-bot-flags', flags),
   discordGwStatus: () => ipcRenderer.invoke('discord-gw-status'),
