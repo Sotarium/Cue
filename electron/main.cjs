@@ -983,8 +983,6 @@ async function handleWinMessage(msg) {
   const fullText = text + ' ' + embedText
 
   const isCongrats = fullText.includes('congratulations') || fullText.includes('won') || fullText.includes('winner') || fullText.includes('congrats')
-  // Debug log: show what we see when claim is active
-  sendDiscordGwLog('[Win?] ch=' + msg.channel_id + ' congrats=' + isCongrats + ' text=' + fullText.slice(0, 100), 'info')
   if (!isCongrats) return
 
   const username = (discordGwUsername || 'sotarium').toLowerCase().replace(/^@/, '')
@@ -1002,7 +1000,6 @@ async function handleWinMessage(msg) {
                           (_gwUserId && (msg.content || '').includes(`<@${_gwUserId}>`)) ||
                           (_gwUserId && (msg.content || '').includes(`<@!${_gwUserId}>`))
 
-  sendDiscordGwLog('[WinCheck] userId=' + _gwUserId + ' username=' + username + ' mentioned=' + (mentionedByObj || mentionedByText), 'info')
   if (!mentionedByObj && !mentionedByText) return
 
   const targetGuildId = msg.guild_id || _gwGuildId || GUILD_ID
@@ -1275,9 +1272,6 @@ function connectGateway() {
         }
 
         if (t === 'MESSAGE_CREATE' || t === 'MESSAGE_UPDATE') {
-          if (discordClaimActive) {
-            sendDiscordGwLog('[GW] ' + t + ' ch=' + d.channel_id + ' | ' + (d.content || JSON.stringify((d.embeds||[]).map(e=>e.title||e.description||'')).slice(0,60)), 'info')
-          }
           await onGatewayMessage(d)
         }
         break

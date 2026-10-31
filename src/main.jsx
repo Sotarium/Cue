@@ -471,6 +471,7 @@ function RollbuxDashboard({ user, onLogout }) {
   }
 
   const [discordGwLogs, setDiscordGwLogs] = useState([])
+  const [logFilterTab, setLogFilterTab] = useState('all') // 'all' | 'joined' | 'claimed'
   // Session-based live stats: always start fresh per app execution session
   const [gwStats, setGwStats] = useState({ joined: 0, won: 0, lost: 0, date: Date.now() })
 
@@ -1644,31 +1645,78 @@ function RollbuxDashboard({ user, onLogout }) {
                   {/* Discord Giveaway Activity Feed */}
                   {(autoJoinGiveaway || autoClaimGiveaway) && (
                     <div className="flex flex-col gap-3 rounded-[16px] border border-white/[0.06] bg-[#0e131f] p-5 shadow-xl w-full">
-                      <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-[#acff46] animate-pulse"></span>
-                          <span className="text-[14px] font-bold text-white">Giveaway Bot Logs</span>
+                      <div className="flex flex-col gap-2.5 border-b border-white/[0.06] pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-[#acff46] animate-pulse"></span>
+                            <span className="text-[14px] font-bold text-white">Giveaway Bot Logs</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12px] text-[#9aa3a8]">Listening to channel #1564378251575562300</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.electronAPI?.openDiscordWindow) {
+                                  window.electronAPI.openDiscordWindow(discordToken)
+                                }
+                              }}
+                              className="flex h-[24px] items-center justify-center rounded-[6px] px-[10px] bg-[#5865F2]/20 hover:bg-[#5865F2] hover:text-white text-[#5865F2] font-bold text-[11px] transition active:scale-95 cursor-pointer"
+                            >
+                              Open Discord Tab
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Category Filter Tabs */}
                         <div className="flex items-center gap-2">
-                          <span className="text-[12px] text-[#9aa3a8]">Listening to channel #1564378251575562300</span>
                           <button
                             type="button"
-                            onClick={() => {
-                              if (window.electronAPI?.openDiscordWindow) {
-                                window.electronAPI.openDiscordWindow(discordToken)
-                              }
-                            }}
-                            className="flex h-[24px] items-center justify-center rounded-[6px] px-[10px] bg-[#5865F2]/20 hover:bg-[#5865F2] hover:text-white text-[#5865F2] font-bold text-[11px] transition active:scale-95 cursor-pointer"
+                            onClick={() => setLogFilterTab('all')}
+                            className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition cursor-pointer ${logFilterTab === 'all' ? 'bg-white/10 text-white' : 'text-[#9aa3a8] hover:text-white hover:bg-white/[0.05]'}`}
                           >
-                            Open Discord Tab
+                            All Logs
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLogFilterTab('joined')}
+                            className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer ${logFilterTab === 'joined' ? 'bg-[#acff46]/15 text-[#acff46]' : 'text-[#9aa3a8] hover:text-[#acff46] hover:bg-white/[0.05]'}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#acff46]"></span>
+                            Joined
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLogFilterTab('claimed')}
+                            className={`px-3 py-1 rounded-[6px] text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer ${logFilterTab === 'claimed' ? 'bg-[#5865F2]/20 text-[#5865F2]' : 'text-[#9aa3a8] hover:text-[#5865F2] hover:bg-white/[0.05]'}`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#5865F2]"></span>
+                            Auto Claimed
                           </button>
                         </div>
                       </div>
+
                       <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-1">
-                        {discordGwLogs.length === 0 ? (
-                          <div className="py-2 text-[12px] text-[#9aa3a8]/60 italic">Waiting for giveaways to appear in channel...</div>
-                        ) : (
-                          discordGwLogs.map((log, idx) => (
+                        {(() => {
+                          const filtered = discordGwLogs.filter(log => {
+                            const msg = (log.message || '').toLowerCase()
+                            if (logFilterTab === 'joined') {
+                              return msg.includes('joined')
+                            }
+                            if (logFilterTab === 'claimed') {
+                              return msg.includes('claim') || msg.includes('ticket') || msg.includes('won')
+                            }
+                            return true
+                          })
+
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="py-3 text-[12px] text-[#9aa3a8]/60 italic">
+                                {logFilterTab === 'joined' ? 'No giveaways joined yet this session.' : logFilterTab === 'claimed' ? 'No claims recorded yet this session.' : 'Waiting for giveaways to appear in channel...'}
+                              </div>
+                            )
+                          }
+
+                          return filtered.map((log, idx) => (
                             <div key={idx} className="flex items-start gap-2 text-[12px]">
                               <span className="text-[#9aa3a8]/50 shrink-0 font-mono">[{log.time}]</span>
                               <span className={log.type === 'success' ? 'text-[#acff46] font-medium' : log.type === 'error' ? 'text-red-400 font-medium' : log.type === 'warn' ? 'text-yellow-400' : 'text-[#c0c6cf]'}>
@@ -1676,7 +1724,7 @@ function RollbuxDashboard({ user, onLogout }) {
                               </span>
                             </div>
                           ))
-                        )}
+                        })()}
                       </div>
 
                       {/* 24h Recap Cards Header & Clear Button */}
