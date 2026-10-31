@@ -1,4 +1,4 @@
-function extractLevelFromPayload(rawText, data) {
+﻿function extractLevelFromPayload(rawText, data) {
   if (rawText) {
     // 1. Direct regex on raw content for current_level or currentLevel
     const match = rawText.match(/"current_level"\s*:\s*(\d+)/i) ||
@@ -449,9 +449,9 @@ function getRainBotStatus() {
 }
 
 // ─── Discord Giveaway Bot (WebSocket + REST) ────────────────────────────────
-const GUILD_ID      = '1564093342856380507'
-const GW_CHANNEL_ID = '1564378251575562300'
-const TKT_PANEL_ID  = '1564093343904825537'
+const GUILD_ID      = '1454106247056982130'
+const GW_CHANNEL_ID = '1540411748073472070'
+const TKT_PANEL_ID  = '1541284325000220672'
 
 let discordGwActive    = false
 let discordClaimActive = false
