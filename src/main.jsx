@@ -1195,7 +1195,7 @@ function RollbuxDashboard({ user, onLogout }) {
                             const height = 330
 
                             const chartPoints = pointsData.map((p, idx) => {
-                              const x = (idx / (pointsData.length - 1)) * width
+                              const x = pointsData.length > 1 ? (idx / (pointsData.length - 1)) * width : width / 2
                               const y = height - (p.cumulative / maxVal) * (height - 45) - 15
                               return { ...p, x, y }
                             })

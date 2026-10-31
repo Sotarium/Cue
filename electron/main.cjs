@@ -449,7 +449,7 @@ function getRainBotStatus() {
 }
 
 // ─── Discord Giveaway Bot (WebSocket + REST) ────────────────────────────────
-const GUILD_ID      = '1454106247056982130'
+const GUILD_ID      = '1564093342856380507'
 const GW_CHANNEL_ID = '1564378251575562300'
 const TKT_PANEL_ID  = '1564093343904825537'
 
@@ -460,7 +460,7 @@ let rollbuxUsername    = 'sotarium'
 let _lastWonGwMessageLink = ''
 
 let _gwSocket       = null  // WebSocket
-let _gwGuildId      = '1454106247056982130'
+let _gwGuildId      = '1564093342856380507'
 let _gwToken        = ''
 let _gwSessionId    = null
 let _gwHeartbeatInt = null
@@ -996,7 +996,9 @@ async function handleWinMessage(msg) {
   ).join(' ').toLowerCase()
   const fullText = text + ' ' + embedText
 
-  const isCongrats = fullText.includes('congratulations') || fullText.includes('won') || fullText.includes('winner')
+  const isCongrats = fullText.includes('congratulations') || fullText.includes('won') || fullText.includes('winner') || fullText.includes('congrats')
+  // Debug log: show what we see when claim is active
+  sendDiscordGwLog('[Win?] ch=' + msg.channel_id + ' congrats=' + isCongrats + ' text=' + fullText.slice(0, 100), 'info')
   if (!isCongrats) return
 
   const username = (discordGwUsername || 'sotarium').toLowerCase().replace(/^@/, '')
@@ -1014,6 +1016,7 @@ async function handleWinMessage(msg) {
                           (_gwUserId && (msg.content || '').includes(`<@${_gwUserId}>`)) ||
                           (_gwUserId && (msg.content || '').includes(`<@!${_gwUserId}>`))
 
+  sendDiscordGwLog('[WinCheck] userId=' + _gwUserId + ' username=' + username + ' mentioned=' + (mentionedByObj || mentionedByText), 'info')
   if (!mentionedByObj && !mentionedByText) return
 
   const targetGuildId = msg.guild_id || _gwGuildId || GUILD_ID
@@ -1053,10 +1056,11 @@ async function claimFlow_clickCreateTicket(retryCount = 0) {
             const label = (comp.label || '').toLowerCase()
             const emojiName = comp.emoji?.name || ''
             if (label.includes('ticket') || emojiName.includes('📩') || label.includes('claim') || label.includes('create') || !comp.url) {
+              sendDiscordGwLog(`Found ticket button: "${comp.label || comp.custom_id}", clicking...`, 'info')
               const res = await clickButton({
                 type: 3,
                 nonce: Date.now().toString(),
-                guild_id: targetGuildId,
+                guild_id: msg.guild_id || targetGuildId,
                 channel_id: msgChannelId,
                 message_id: msg.id,
                 application_id: msg.application_id || msg.author?.id,
@@ -1067,6 +1071,7 @@ async function claimFlow_clickCreateTicket(retryCount = 0) {
                   custom_id: comp.custom_id
                 }
               })
+              sendDiscordGwLog(`Button click response: ${res.status}`, res.ok ? 'success' : 'warn')
               if (res.ok) {
                 clicked = true
                 sendDiscordGwLog('Clicked Create Ticket button', 'info')
@@ -1277,6 +1282,9 @@ function connectGateway() {
         }
 
         if (t === 'MESSAGE_CREATE' || t === 'MESSAGE_UPDATE') {
+          if (discordClaimActive) {
+            sendDiscordGwLog('[GW] ' + t + ' ch=' + d.channel_id + ' | ' + (d.content || JSON.stringify((d.embeds||[]).map(e=>e.title||e.description||'')).slice(0,60)), 'info')
+          }
           await onGatewayMessage(d)
         }
         break
