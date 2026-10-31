@@ -594,47 +594,33 @@ async function getGuildCommands(guildId, channelId) {
   if (_guildCommandsCache && _guildCommandsCache.length) return _guildCommandsCache
   const targetGuildId = guildId || _gwGuildId || GUILD_ID
 
-  // Try both the provided channel AND the GW channel
+  try {
+    // Guild command index (always returns full list of guild commands including InviteManager)
+    const rGuild = await discordRequest('GET', '/guilds/' + targetGuildId + '/application-command-index')
+    console.log('[SlashCmd] Guild index status:', rGuild.status, 'found:', rGuild.body && rGuild.body.application_commands ? rGuild.body.application_commands.length : 0)
+    if (rGuild.status === 200 && Array.isArray(rGuild.body && rGuild.body.application_commands) && rGuild.body.application_commands.length > 0) {
+      _guildCommandsCache = rGuild.body.application_commands
+      console.log('[SlashCmd] Cached commands count:', _guildCommandsCache.length)
+      return _guildCommandsCache
+    }
+  } catch (err) {
+    console.error('[SlashCmd] Guild index error:', err.message)
+  }
+
   const channelIds = []
   if (channelId) channelIds.push(channelId)
   if (GW_CHANNEL_ID && GW_CHANNEL_ID !== channelId) channelIds.push(GW_CHANNEL_ID)
 
   for (const cid of channelIds) {
     try {
-      // Search with 'invites' query
       const r = await discordRequest('GET', '/channels/' + cid + '/application-commands/search?type=1&query=invites&limit=25&include_applications=true')
-      console.log('[SlashCmd] Channel', cid, 'query search:', r.status, 'found:', r.body && r.body.application_commands ? r.body.application_commands.length : 0)
       if (r.status === 200 && Array.isArray(r.body && r.body.application_commands) && r.body.application_commands.length > 0) {
         _guildCommandsCache = r.body.application_commands
-        console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
-        return _guildCommandsCache
-      }
-    } catch (err) {}
-
-    try {
-      // Search without query (returns all slash commands in channel)
-      const r = await discordRequest('GET', '/channels/' + cid + '/application-commands/search?type=1&limit=50&include_applications=true')
-      console.log('[SlashCmd] Channel', cid, 'all-cmd search:', r.status, 'found:', r.body && r.body.application_commands ? r.body.application_commands.length : 0)
-      if (r.status === 200 && Array.isArray(r.body && r.body.application_commands) && r.body.application_commands.length > 0) {
-        _guildCommandsCache = r.body.application_commands
-        console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
         return _guildCommandsCache
       }
     } catch (err) {}
   }
 
-  try {
-    // Guild command index fallback
-    const rGuild = await discordRequest('GET', '/guilds/' + targetGuildId + '/application-command-index')
-    console.log('[SlashCmd] Guild index:', rGuild.status, 'found:', rGuild.body && rGuild.body.application_commands ? rGuild.body.application_commands.length : 0)
-    if (rGuild.status === 200 && Array.isArray(rGuild.body && rGuild.body.application_commands) && rGuild.body.application_commands.length > 0) {
-      _guildCommandsCache = rGuild.body.application_commands
-      console.log('[SlashCmd] Cached commands:', _guildCommandsCache.map(function(c) { return c.name }).join(', '))
-      return _guildCommandsCache
-    }
-  } catch (err) {}
-
-  console.log('[SlashCmd] No commands found via any search method')
   return []
 }
 
@@ -1097,8 +1083,14 @@ async function claimFlow_clickCreateTicket(retryCount = 0) {
     return
   }
 
-  // After clicking, poll for newly created ticket channel
-  setTimeout(() => claimFlow_findAndSendOne(0), 3000)
+  // After clicking, the gateway CHANNEL_CREATE / THREAD_CREATE event will trigger the claim.
+  // We set a fallback timer only in case the gateway event does not fire.
+  setTimeout(() => {
+    if (_claimState === 'waiting_ticket_msg') {
+      sendDiscordGwLog('Gateway event timeout, scanning channels fallback...', 'info')
+      claimFlow_findAndSendOne(0)
+    }
+  }, 7000)
 }
 
 // Convert snowflake string to epoch ms
@@ -1111,7 +1103,8 @@ function snowflakeToMs(id) {
 }
 
 async function claimFlow_findAndSendOne(attempt) {
-  if (_claimState === 'claiming_done') return
+  if (_claimState === 'claiming_done' || _claimState === 'claiming_in_progress') return
+  _claimState = 'claiming_in_progress'
   if (attempt > 15) {
     sendDiscordGwLog('Gave up waiting for ticket channel after 60s.', 'warn')
     _claimState = 'idle'
@@ -1721,27 +1714,28 @@ function openDiscordLiveWindow(token) {
 
   discordTabWindow.on('closed', () => { discordTabWindow = null })
 
-  // Discord web token injector
-  discordTabWindow.webContents.on('dom-ready', async () => {
-    if (!discordTabWindow || discordTabWindow.isDestroyed()) return
-    if (cleanTok) {
-      try {
-        await discordTabWindow.webContents.executeJavaScript(`
-          (function() {
-            try {
-              const tok = ${JSON.stringify(cleanTok)};
-              const cur = window.localStorage.getItem('token');
-              if (tok && (!cur || cur !== '"' + tok + '"')) {
-                window.localStorage.setItem('token', '"' + tok + '"');
-                window.sessionStorage.setItem('token', '"' + tok + '"');
-                setTimeout(() => window.location.reload(), 150);
-              }
-            } catch(e) {}
-          })();
-        `)
-      } catch (err) {}
-    }
-  })
+  // Robust Discord web token injector
+  const injectToken = async () => {
+    if (!discordTabWindow || discordTabWindow.isDestroyed() || !cleanTok) return
+    try {
+      await discordTabWindow.webContents.executeJavaScript(`
+        (function() {
+          try {
+            const tok = ${JSON.stringify(cleanTok)};
+            window.localStorage.setItem('token', '"' + tok + '"');
+            window.sessionStorage.setItem('token', '"' + tok + '"');
+            // If on login page, redirect to app
+            if (location.pathname.includes('/login') || location.pathname === '/') {
+              location.href = '/channels/${targetGuild}/${GW_CHANNEL_ID}';
+            }
+          } catch(e) {}
+        })();
+      `)
+    } catch (e) {}
+  }
+
+  discordTabWindow.webContents.on('dom-ready', injectToken)
+  discordTabWindow.webContents.on('did-finish-load', injectToken)
 
   const targetGuild = _gwGuildId || GUILD_ID
   const targetChannel = GW_CHANNEL_ID ? `https://discord.com/channels/${targetGuild}/${GW_CHANNEL_ID}` : 'https://discord.com/app'
